@@ -7,28 +7,14 @@
   http://www.abrandao.com/arduino_esp32_door
 */
 
-
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <Time.h>
-#include <wifi_info.h>  //defines with senstivie data (use .gitignore ) to keep off github public repos
+#include "wifi_info.h" //defines with senstivie data (use .gitignore ) to keep off github public repos
 
 WiFiClient espClient;
 
-/* Sample wifi_info.h file  cut and save belw as your own wifi_info.h file
- * 
- * 
- * #define wifi_ssid "WIFI-N"  //replace with actual WIFI SSID
- * #define wifi_password "your_password_here"  //replace with your actual password
- * #define wifi_timeout 20*1000   //Milliseconds to go to sleep if not connected
- * #define mqtt_server "192.168.1.199"  //MQTT broker address, recommend you make it static
- * #define mqtt_user ""
- * #define mqtt_password ""
-
- * 
- */
-
-#define MQTT_KEEPALIVE 45;  //default keep alive is 15S this overrides that
+#define MQTT_KEEPALIVE 45;  //default keep alive is 15s this overrides that, will produce warnings "MQTT_KEEPALIVE" redefined
 
 #define LED_BUILTIN 2
 #define topic_door "sensor/door"
