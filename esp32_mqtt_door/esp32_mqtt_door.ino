@@ -14,14 +14,13 @@
 
 WiFiClient espClient;
 
-#define MQTT_KEEPALIVE 45;  //default keep alive is 15s this overrides that, will produce warnings "MQTT_KEEPALIVE" redefined
-
 #define LED_BUILTIN 2
 #define topic_door "sensor/door"
+#define topic_runtime "sensor/runtime"
 
 
 gpio_num_t  reedSensor = GPIO_NUM_33;  // Reed PIN:
-gpio_num_t GPIO_INPUT_IO_TRIGGER = reedSensor;
+gpio_num_t GPIO_INPUT_IO_TRIGGER = reedSensor;  //alias name
 int GPIO_DOOR_CLOSED_STATE= HIGH;   //Default state when the reed and magent are next to each other (depends on reed switch)
 int GPIO_DOOR_OPEN_STATE = !GPIO_DOOR_CLOSED_STATE;  //Open state is oposite f closed
 int doorState=0;
@@ -75,24 +74,22 @@ void setup_wifi() {
   
   // We start by connecting to a WiFi network
   Serial.println();
-  Serial.print("Connecting to ");
+  Serial.print((String)(millis()- start_time ) + "  Connecting to ");
   Serial.println(wifi_ssid);
   
   WiFi.begin(wifi_ssid, wifi_password);
 
  int count=0;
- String ssid=String(wifi_ssid);
+ 
  
   while (WiFi.status() != WL_CONNECTED) {
     
     count++;
    if ( count % 40==0 )
-    Serial.print("\n");
+    Serial.print((String)(millis()- start_time ) +" \n");
     else
    Serial.print(".");
-
-    delay(25);
-    
+   delay(25);
      //while waiting for WIFI connection check if door state is closed if so then just dont bother to connect and sleep
     doorState = digitalRead(reedSensor);
     if (doorState==GPIO_DOOR_CLOSED_STATE)  //going to cleep
@@ -103,7 +100,7 @@ void setup_wifi() {
     //wifi not responding go to sleep and wait for next interrupt
      if (millis()- start_time > wifi_timeout)
           {
-             Serial.println( (String)(millis()- start_time ) + "ms Error connecting to :"+ssid +" Check AP ");
+             Serial.println( (String)(millis()- start_time ) + "ms Error connecting to :"+wifi_ssid +" Check AP ");
             //Go to sleep now
              Serial.println("Wifi Timedout Going to sleep now");
             esp_deep_sleep_start();
@@ -111,22 +108,31 @@ void setup_wifi() {
   }
   
   rssi= WiFi.RSSI();
-  Serial.println( "\n WiFi connected in " +(String)(millis()- start_time ) + "ms to AP:"+ssid+ " Rssi:"+(String)rssi );
+  Serial.println( "\n WiFi connected in " +(String)(millis()- start_time ) + "ms to AP:"+wifi_ssid+ " Rssi:"+(String)rssi );
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
 }
 
 void reconnect() {
+  int failcount=0;  //too many mqtt fails go to sleep
+  int max_fails=2;  
   // Loop until we're reconnected
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
     // If you do not want to use a username and password, change next line to
     // for password
-//    if (client.connect("ESPxxClient", mqtt_user, mqtt_password)) {
+    //    if (client.connect("ESPxxClient", mqtt_user, mqtt_password)) {  
     if (client.connect("ESPxxClient")) {
       Serial.println("connected to "+String(mqtt_server) );
     } else {
+       failcount++;
+      if (  failcount >=  max_fails )
+          {
+            //Go to sleep now
+             Serial.println("MQTT Server NOT available Timedout Going to sleep now");
+            esp_deep_sleep_start();
+          }
       Serial.print("failed, rc=");
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
@@ -157,6 +163,16 @@ void runtime(unsigned long ms, char runtime_str[])
  
 }
 
+
+void  doorOpenMQTT(int doorState)
+ {
+
+   mqtt_door_state=!doorState;
+   itoa(mqtt_door_state, door_state_val, 10);
+   SendMQTT_message(topic_door,door_state_val );
+
+  
+ }
 
 // Start of the main setup  routine /////////////////////
 void setup() {
@@ -213,10 +229,8 @@ void setup() {
    
    //Now send the MQTT message  
   
-   mqtt_door_state=!doorState;
-   itoa(mqtt_door_state, door_state_val, 10);
-   SendMQTT_message(topic_door,door_state_val );
-
+   doorOpenMQTT(doorState);
+   
   String boot=String(bootCount);
    SendMQTT_message("sensor/bootcount",boot.c_str() );
 
@@ -235,7 +249,8 @@ void setup() {
     int n=0;
     Serial.println("Door State now:");
      Serial.println(currentdoorState);
-   
+
+   unsigned long timer1= millis();
     while (doorState==GPIO_DOOR_OPEN_STATE)  //while where open
     {
       n++;
@@ -243,15 +258,18 @@ void setup() {
           last_state=doorState;
      // print out the state of the button:
       Serial.print(doorState);
-      if (n%40==0)
-       Serial.println( (String) (millis()-start_time ) + "ms \n" );
-      delay(50);        // delay in between reads for stability
+      if (n%50==0)
+       Serial.println( (String) (millis()-timer1 ) + "ms \n" );
+      delay(25);        // delay in between reads for stability
+
+      if (n%1000 == 0)  //send a door open message to MQTT to prevent timeouts
+      doorOpenMQTT(doorState);
     }
 
 
       runtime( running_time_millis + millis(),runtime_str ) ;  //Savves the output in runtime str
       Serial.println(runtime_str);
-      SendMQTT_message("sensor/running_time",runtime_str);
+      SendMQTT_message(topic_runtime,runtime_str);
 
 
   //Now send the changed doorstate MQTT message 
