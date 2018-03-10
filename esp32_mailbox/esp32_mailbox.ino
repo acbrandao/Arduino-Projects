@@ -16,13 +16,15 @@
 
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <HTTPClient.h>
 #include <Time.h>
 
 /*
  * wifi_info.h includs wifi ssid, passwords, mqtt broker info, customize included wifi_info_sample.h and
  * save as wifi_info.h in this same folder.
  */
-#include "wifi_info.h"  // contains ssid and access credentials, sperate file for GitHub
+#include "wifi_info.h"  // contains ssid and access credentials,sms, mqtt broker configs sperate file for GitHub
+#define sms_enabled false //enable this if you have setup an sms service like tiwlio or nexmo etc..
 
 #define MAX_OPENDOOR_TIME 30000   //default 30s in milliseconds how long to wait while door is open to consider it stuck open 
 #define MAX_STUCK_BOOT_COUNT 5  // If the door is stuck for more than x times let's switch to timer interrupt to save battery
@@ -31,6 +33,7 @@
 // Define the the MQTT and WiFI client variables
 WiFiClient espClient;
 PubSubClient client(espClient);
+HTTPClient http;  //for posting 
 
 //Define the door Sensor PIN and initial state (Depends on your reed sensor N/C  or N/O )
 gpio_num_t  doorSensorPIN = GPIO_NUM_12;  // Reed GPIO PIN:
@@ -132,6 +135,55 @@ void reconnect() {
     }
   }
 }
+
+/* Sends a SMS if you have a service like twiliio, or nexmo defined */
+int send_SMS(String message)
+{
+  if (!sms_enabled) 
+        return false; //no sms send feature is available
+    
+      if(WiFi.status()== WL_CONNECTED) //Check WiFi connection status
+      { 
+        
+        
+        http.begin(sms_post_url, "‎0f80611c823161d52f28e78d4638b42ce1c6d9e2");
+        http.addHeader("Content-Type", "application/json");
+
+        /* SMS CODE PoST example is for the nexmo specific service ONLY, 
+         *  if you use another popular SMS service  ones like  Twilio , Plivo, Sinch 
+         *  be sure too change the POST request according. Refer to their cURL examples
+         */
+        /*
+        curl -X "POST" "https://rest.nexmo.com/sms/json" \
+        -d "from=NEXMO Number" \
+        -d "text=A text message sent using the Nexmo SMS API" \
+        -d "to=TO_NUMBER" \
+        -d "api_key=NEXMO_API_KEY" \
+        -d "api_secret=NEXMO_API_SECRET"
+        */
+
+        
+        String postMessage = String(" {'from' : '" +(String)sms_from +"', 'text' : '" + (String)message +"', 'to' : '"+(String) sms_to_number+"', 'api_key' : '"+ (String)sms_api_key+"', 'api_secret' : '"+ (String)sms_api_secret+"' \}");
+        
+        int httpCode = http.POST(postMessage);
+        
+        Serial.printf("\nhttp result: %d",httpCode);
+        http.writeToStream(&Serial);
+     
+        String payload = http.getString();
+        
+        http.end();
+        
+        return httpCode;
+
+        } 
+      else
+      {
+       Serial.print("Error in Wifi connection");
+        return false;
+      }
+        
+}  //end send sms
 
 /* Formatting function to convert millis into h:m:s */
 void runtime(unsigned long ms )
@@ -235,7 +287,8 @@ void setup() {
    client.publish("/sensor/bootcount",String(bootCount).c_str(), false); 
    client.publish("/sensor/name", mqtt_clientid , false);  //client id
    client.publish("/sensor/rssi",String(rssi).c_str() , false);   // wifi rssi = signal strenght 0 - 100 , <-80 is poor
-    
+   
+   send_SMS("You've got mail"); //optional: send sms message - requires SMS service
     
     long  n=0; //loop counter while door is opened
     while (doorState==GPIO_DOOR_OPEN_STATE)  //while where open
@@ -259,6 +312,7 @@ void setup() {
         {
           Serial.printf("\n Door STUCK OPEN for %ld ms > %d ms .. ending loop. ", elapsed_time,MAX_OPENDOOR_TIME );
           client.publish("/sensor/door_status","stuck open?",false);
+          //send_SMS("Mailbox stuffed- lid is open.");  //optional send message when mailbox is stuck open
           esp32_sleep();  
           //code here not executed
         }

@@ -14,3 +14,13 @@
 #define mqtt_clientid "ESP32 LoLin"  //Client id string for Mqtt broker
 #define mqtt_max_retries 10 //maximum number of times to retry mqtt server before aborting
 
+
+/* Optional but you can define a messaging serice SMS such as twilio, nexmo etc.
+* TO USE THIS FEATURe you NEED TO SiGNUP TO AN SMS Service  
+*/
+
+#define sms_post_url   "https://rest.nexmo.com/sms/json"
+#define sms_to_number  "YOUR TO NUMBER"   // must be in the list of approved numbers
+#define sms_from       "VALID NEXMO NUMBER"   
+#define sms_api_key    "API_KEY"
+#define sms_api_secret "API_SECRET" 
