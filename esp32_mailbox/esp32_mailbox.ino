@@ -247,7 +247,7 @@ void setup() {
       {
         Serial.println("Max stuck open count door reached ");
         Serial.printf("\n Putting ESP into a TIMER WAKEUP of %d secs. \n",(TIMER_SLEEP_MICROSECS/1000000) );
-        esp_sleep_enable_timer_wakeup(TIMER_SLEEP_MICROSECS); //lets go to sleep instead of GPIO wakeup
+        esp_sleep_enable_timer_wakeup(TIMER_SLEEP_MICROSECS); //lets go to TIMER Interrupt sleep instead of GPIO wakeup
         esp32_sleep();
       }
      else 
