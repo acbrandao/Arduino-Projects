@@ -3,7 +3,10 @@
  *
  *  This sketch makes use  of a ESP32 with its WiFi and  Interrupt & Timer GPIO pins to wake the ESP32 
  *  get the door sensor and send a payload to the MQTT broker. The script is designed to run in  a low-power
- *  state utilizing ESP32 ppower saving deep sleep modes and detecting stuck open door.
+ *  state utilizing ESP32 ppower saving deep sleep modes and detecting stuck open door. 
+ *  
+ *  I used this for my mailbox, but it can be adapted to any door-like environment where you can attach reed/magentic
+ *  or  other sensors to detect open/close states.
  * 
  * This example code is in the public domain.
  *
@@ -209,8 +212,6 @@ void setup() {
   //Wake up when it goes high - may be inverted for your reed door sensors
   esp_sleep_enable_ext0_wakeup(GPIO_INPUT_IO_TRIGGER,GPIO_DOOR_OPEN_STATE); //1 = High, 0 = Low  wake door OPEN (magnet away sensor)
  
-  //Now wait for the state to change back to close.. 
-   pinMode(doorSensorPIN, INPUT);
   
   //Print the wakeup reason for ESP32
   print_wakeup_reason();
@@ -230,23 +231,26 @@ void setup() {
    
    //Now send the MQTT message  
    client.publish("/sensor/door", String(doorState).c_str(), false);  //false means don't retain messages
+   client.publish("/sensor/door_status","open", false);  //text version of door
    client.publish("/sensor/bootcount",String(bootCount).c_str(), false); 
    client.publish("/sensor/name", mqtt_clientid , false);  //client id
    client.publish("/sensor/rssi",String(rssi).c_str() , false);   // wifi rssi = signal strenght 0 - 100 , <-80 is poor
-
+    
+    
     long  n=0; //loop counter while door is opened
     while (doorState==GPIO_DOOR_OPEN_STATE)  //while where open
     {
       n++;
-      client.publish("/sensor/door_status","open", false); 
-      doorState = digitalRead(doorSensorPIN); //Read the pin
+  
+      doorState = digitalRead(doorSensorPIN); //Keep reading the door state
       
       // print out the state of the button:
       Serial.print(doorState);
+      
       long elapsed_time=(millis()-start_time); 
       
-      if (n%40==0)
-       Serial.printf(  "%ld ms \n",elapsed_time );  //print the time in ms
+      if (n%40==0)      //new line so it doens't scroll of the screen
+       Serial.printf(  "%ld ms \n",elapsed_time );  //print the time in every 40 cyclels 
       delay(50);        // delay in between reads for stability
 
 
@@ -256,24 +260,31 @@ void setup() {
           Serial.printf("\n Door STUCK OPEN for %ld ms > %d ms .. ending loop. ", elapsed_time,MAX_OPENDOOR_TIME );
           client.publish("/sensor/door_status","stuck open?",false);
           esp32_sleep();  
-          break; //exit this while Loop
+          //code here not executed
         }
     }
 
-      
-      runtime(millis()-currentMillis +time_awake_millis ) ; //calculate total_time_awake  how long the door was opened in h:m:s
+      //calculate total_time_awake  how long the esp32 board was running
+      runtime(millis()-currentMillis +time_awake_millis ) ; 
       Serial.println("ESp32 total awaketime ::"+(String)total_time_awake);     
-      client.publish("/sensor/door", String(doorState).c_str(), false);  //don't retain messages
-      client.publish("/sensor/door_status","closed",false);
-      client.publish("/sensor/total_time_awake",total_time_awake,false);
-      
-      Serial.println("\n Pausing to give MQTT time to get message: Result of Publish: ");
-      delay(1000); //give MQTT broker a chance to get message -  before disconnecting wifi
-        
-    WiFi.disconnect();
-    Serial.println("\n Wifi Disconnected from : "+(String)wifi_ssid);
+       client.publish("/sensor/door_status","closed",false);  //text version of /sensor/door
+       client.publish("/sensor/total_time_awake",total_time_awake,false);
+      int result= client.publish("/sensor/door", String(doorState).c_str(), false);  //door status
     
-    digitalWrite(LED_BUILTIN, LOW); // Turn the LED oFF   
+      delay(500); //give MQTT broker a chance to get message -  before disconnecting wifi
+     
+      if (result==true)  //did we successfully publish the last message
+        {
+          client.disconnect();   //disconnect Mqtt broker
+          WiFi.disconnect();    //disconnect WiFi
+          Serial.println("\n Wifi Disconnected from : "+(String)wifi_ssid);
+          }
+       else
+         Serial.printf("\n  Error in Publishing last message PubSub Error code: %d",result);
+       
+        
+   
+    digitalWrite(LED_BUILTIN, LOW); // :: Turn the LED oFF   
   }
   else
   Serial.println("\n Door State Unchanged not triggering wifi");
