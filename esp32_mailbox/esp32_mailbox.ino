@@ -24,11 +24,17 @@
  * save as wifi_info.h in this same folder.
  */
 #include "wifi_info.h"  // contains ssid and access credentials,sms, mqtt broker configs sperate file for GitHub
-#define sms_enabled false //enable this if you have setup an sms service like tiwlio or nexmo etc..
 
+#define LED_ENABLED false  //do we want to turn on the on-board LED when connected to WiFi? 
 #define MAX_OPENDOOR_TIME 30000   //default 30s in milliseconds how long to wait while door is open to consider it stuck open 
 #define MAX_STUCK_BOOT_COUNT 5  // If the door is stuck for more than x times let's switch to timer interrupt to save battery
 #define TIMER_SLEEP_MICROSECS 1800 * 1000000  //when on timer interrupt how long to sleep in seconds * microseconds
+
+// /sensor/door_status messages for open closed and stuck
+#define  message_door_open "Mailbox Opened!"
+#define  message_door_closed ""
+#define  message_door_stuck "Mailbox_STUCK_OPEN!"
+
 
 // Define the the MQTT and WiFI client variables
 WiFiClient espClient;
@@ -140,15 +146,21 @@ void reconnect() {
 int send_SMS(String message)
 {
   if (!sms_enabled) 
-        return false; //no sms send feature is available
+        return false; //no sms send service is available
     
       if(WiFi.status()== WL_CONNECTED) //Check WiFi connection status
       { 
         
-        
-        http.begin(sms_post_url, "‎0f80611c823161d52f28e78d4638b42ce1c6d9e2");
-        http.addHeader("Content-Type", "application/json");
+        // Use web browser to view and copy
+        // SHA1 fingerprint (thumprint in Goolge Chrmee)  of the certificate
+        // to get finger print look in browser inspect sssl certificate or
+        // run echo | openssl s_client -connect your_https_url.com :443 |& openssl x509 -fingerprint -noout 
+        const char* ssh_fingerprint = "CB 7B 07 CA B1 87 23 EA C6 E9 D1 A4 B7 98 63 D3 50 79 0F 61";
+        http.begin(sms_post_url, ssh_fingerprint);
 
+        
+       // http.addHeader("Content-Type", "application/json"); //did not work
+        http.addHeader("Content-Type", "text/html");
         /* SMS CODE PoST example is for the nexmo specific service ONLY, 
          *  if you use another popular SMS service  ones like  Twilio , Plivo, Sinch 
          *  be sure too change the POST request according. Refer to their cURL examples
@@ -163,12 +175,17 @@ int send_SMS(String message)
         */
 
         
-        String postMessage = String(" {'from' : '" +(String)sms_from +"', 'text' : '" + (String)message +"', 'to' : '"+(String) sms_to_number+"', 'api_key' : '"+ (String)sms_api_key+"', 'api_secret' : '"+ (String)sms_api_secret+"' \}");
+       // char PostData[]  = "[{\"from\" : \"" +(String)sms_from +"\", \"text\" : \"" + (String)message +"\", \"to\" : \""+(String) sms_to_number+"\", \"api_key\" : \""+ (String)sms_api_key+"\", \"api_secret\" : \""+ (String)sms_api_secret+"\" }]";
+
+     char PostData[]  = "[ {\"from\" : \"12016441511\", \"text\" : \"Testing\", \"to\" : \"19738687140\", \"api_key\" : \"c10afa36\", \"api_secret\" : \"ieOU8BV9Cs3AqV42\" }]";          
+
         
-        int httpCode = http.POST(postMessage);
+        Serial.println((String)sms_post_url+" JSON Post:\n"+(String)PostData );
+        int httpCode = http.POST(PostData);
         
-        Serial.printf("\nhttp result: %d",httpCode);
+        Serial.printf("\nhttp result: %d \n",httpCode);
         http.writeToStream(&Serial);
+        Serial.printf("\n------------------\n");
      
         String payload = http.getString();
         
@@ -184,6 +201,22 @@ int send_SMS(String message)
       }
         
 }  //end send sms
+
+/* Now Setup WIFI and MQTT connections -     */
+int connect_WIFI_MQTT()
+{
+   //Now Setup WIFI and MQTT connections -   
+   setup_wifi();
+   client.setServer(mqtt_server, 1883);
+
+  //Now do the normal LoopCode here
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+  
+  return true;
+}
 
 /* Formatting function to convert millis into h:m:s */
 void runtime(unsigned long ms )
@@ -258,9 +291,22 @@ void setup() {
       esp32_sleep();
      }
     }
-  
-   stuckbootCount=0; //reset the stuckboot counter each time we get a clean GPIO wakeup
 
+
+  //was the door stuck open but now is closed.. re-set the door status send a message to indicate closed
+   if ( stuckbootCount > MAX_STUCK_BOOT_COUNT )
+     {
+        if (  connect_WIFI_MQTT() )
+         {
+           client.publish("/sensor/door", String(doorState).c_str(), false);  //false means don't retain messages
+           client.publish("/sensor/door_status",message_door_closed, false);  //text version of door
+          }
+        
+        stuckbootCount=0; //reset the stuckboot counter each time we get a clean GPIO wakeup
+
+     }
+
+     
   //Wake up when it goes high - may be inverted for your reed door sensors
   esp_sleep_enable_ext0_wakeup(GPIO_INPUT_IO_TRIGGER,GPIO_DOOR_OPEN_STATE); //1 = High, 0 = Low  wake door OPEN (magnet away sensor)
  
@@ -270,31 +316,27 @@ void setup() {
  
  if(doorState != GPIO_DOOR_CLOSED_STATE) //is the door NOT closed?
   {
-   //Now Setup WIFI and MQTT connections -   //ONLY IF DOOR IS OPENED otehrwise ignore
+   if (LED_ENABLED)
    digitalWrite(LED_BUILTIN, HIGH); // Turn the LED on
-  setup_wifi();
-  client.setServer(mqtt_server, 1883);
-
-  //Now do the normal LoopCode here
-  if (!client.connected()) {
-    reconnect();
-  }
-  client.loop();
+  
+   connect_WIFI_MQTT(); //connect to wifi and MQTT Broker
    
    //Now send the MQTT message  
    client.publish("/sensor/door", String(doorState).c_str(), false);  //false means don't retain messages
-   client.publish("/sensor/door_status","open", false);  //text version of door
+   client.publish("/sensor/door_status",message_door_open, false);  //text version of door
    client.publish("/sensor/bootcount",String(bootCount).c_str(), false); 
    client.publish("/sensor/name", mqtt_clientid , false);  //client id
    client.publish("/sensor/rssi",String(rssi).c_str() , false);   // wifi rssi = signal strenght 0 - 100 , <-80 is poor
-   
-   send_SMS("You've got mail"); //optional: send sms message - requires SMS service
+
+   //if you have SMS enabled.. send out a message
+   send_SMS("You have mail"); //optional: send sms message - requires SMS service
     
     long  n=0; //loop counter while door is opened
     while (doorState==GPIO_DOOR_OPEN_STATE)  //while where open
     {
       n++;
-  
+      client.loop();  //call regularly to keep the connection to mqtt broker open
+       
       doorState = digitalRead(doorSensorPIN); //Keep reading the door state
       
       // print out the state of the button:
@@ -310,10 +352,12 @@ void setup() {
       //If the door is still OPEN  after MAX_OPENDOOR_TIME time, assume its stuck open and just send a message
       if (elapsed_time > MAX_OPENDOOR_TIME)
         {
+         
           Serial.printf("\n Door STUCK OPEN for %ld ms > %d ms .. ending loop. ", elapsed_time,MAX_OPENDOOR_TIME );
-          client.publish("/sensor/door_status","stuck open?",false);
           //send_SMS("Mailbox stuffed- lid is open.");  //optional send message when mailbox is stuck open
-          esp32_sleep();  
+          client.publish("/sensor/door_status",message_door_stuck, false);  //text version of door
+              
+          break;
           //code here not executed
         }
     }
@@ -321,23 +365,19 @@ void setup() {
       //calculate total_time_awake  how long the esp32 board was running
       runtime(millis()-currentMillis +time_awake_millis ) ; 
       Serial.println("ESp32 total awaketime ::"+(String)total_time_awake);     
-       client.publish("/sensor/door_status","closed",false);  //text version of /sensor/door
+       
+       if (doorState==LOW)  //only if the door is really closed , check in case we fell through while loop
+       client.publish("/sensor/door_status",message_door_closed,false);  //text version of /sensor/door
        client.publish("/sensor/total_time_awake",total_time_awake,false);
       int result= client.publish("/sensor/door", String(doorState).c_str(), false);  //door status
     
-      delay(500); //give MQTT broker a chance to get message -  before disconnecting wifi
-     
-      if (result==true)  //did we successfully publish the last message
-        {
-          client.disconnect();   //disconnect Mqtt broker
-          WiFi.disconnect();    //disconnect WiFi
-          Serial.println("\n Wifi Disconnected from : "+(String)wifi_ssid);
-          }
-       else
-         Serial.printf("\n  Error in Publishing last message PubSub Error code: %d",result);
-       
-        
+      delay(250); //give MQTT broker a chance to get message -  before disconnecting wifi
    
+      client.disconnect();   //disconnect Mqtt broker
+      WiFi.disconnect();    //disconnect WiFi
+      Serial.println("\n Wifi Disconnected from : "+(String)wifi_ssid);
+  
+   if (LED_ENABLED)  
     digitalWrite(LED_BUILTIN, LOW); // :: Turn the LED oFF   
   }
   else
