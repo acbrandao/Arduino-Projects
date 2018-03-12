@@ -1,5 +1,5 @@
 /*
- * ESP32 Arduino Door/Mailbox reed sensor to MQTT server
+ * ESP32 Arduino Door reed sensor to MQTT server
  *
  *  This sketch makes use  of a ESP32 with its WiFi and  Interrupt & Timer GPIO pins to wake the ESP32 
  *  get the door sensor and send a payload to the MQTT broker. The script is designed to run in  a low-power
