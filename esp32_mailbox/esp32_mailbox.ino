@@ -3,31 +3,43 @@
  *
  *  This sketch makes use  of a ESP32 with its WiFi and  Interrupt & Timer GPIO pins to wake the ESP32 
  *  get the door sensor and send a payload to the MQTT broker. The script is designed to run in  a low-power
- *  state utilizing ESP32 ppower saving deep sleep modes and detecting stuck open door.
+ *  state utilizing ESP32 ppower saving deep sleep modes and detecting stuck open door. 
+ *  
+ *  I used this for my mailbox, but it can be adapted to any door-like environment where you can attach reed/magentic
+ *  or  other sensors to detect open/close states.
  * 
  * This example code is in the public domain.
  *
  *For full code explanation visit:
-  * http://www.abrandao.com/arduino_esp32_wifi_door_mailbox_sensor
+  * http://www.abrandao.com/2018/03/arduino_esp32_battery_wifi_door_mailbox_sensor
 */
 
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <HTTPClient.h>
 #include <Time.h>
 
 /*
  * wifi_info.h includs wifi ssid, passwords, mqtt broker info, customize included wifi_info_sample.h and
  * save as wifi_info.h in this same folder.
  */
-#include "wifi_info.h"  // contains ssid and access credentials, sperate file for GitHub
+#include "wifi_info.h"  // contains ssid and access credentials,sms, mqtt broker configs sperate file for GitHub
 
+#define LED_ENABLED false  //do we want to turn on the on-board LED when connected to WiFi? 
 #define MAX_OPENDOOR_TIME 30000   //default 30s in milliseconds how long to wait while door is open to consider it stuck open 
 #define MAX_STUCK_BOOT_COUNT 5  // If the door is stuck for more than x times let's switch to timer interrupt to save battery
 #define TIMER_SLEEP_MICROSECS 1800 * 1000000  //when on timer interrupt how long to sleep in seconds * microseconds
 
+// /sensor/door_status messages for open closed and stuck
+#define  message_door_open "Mailbox Opened!"
+#define  message_door_closed ""
+#define  message_door_stuck "Mailbox_STUCK_OPEN!"
+
+
 // Define the the MQTT and WiFI client variables
 WiFiClient espClient;
 PubSubClient client(espClient);
+HTTPClient http;  //for posting 
 
 //Define the door Sensor PIN and initial state (Depends on your reed sensor N/C  or N/O )
 gpio_num_t  doorSensorPIN = GPIO_NUM_12;  // Reed GPIO PIN:
@@ -130,6 +142,40 @@ void reconnect() {
   }
 }
 
+/* TODO : Sends a SMS if you have a service like twiliio, or nexmo defined */
+int send_SMS(String message)
+{
+  if (!sms_enabled) 
+        return false; //no sms send service is available
+    
+      if(WiFi.status()== WL_CONNECTED) //Check WiFi connection status
+      { 
+        
+        } 
+      else
+      {
+       Serial.print("Error in Wifi connection");
+        return false;
+      }
+        
+}  //end send sms
+
+/* Now Setup WIFI and MQTT connections -     */
+int connect_WIFI_MQTT()
+{
+   //Now Setup WIFI and MQTT connections -   
+   setup_wifi();
+   client.setServer(mqtt_server, 1883);
+
+  //Now do the normal LoopCode here
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+  
+  return true;
+}
+
 /* Formatting function to convert millis into h:m:s */
 void runtime(unsigned long ms )
 {
@@ -192,90 +238,105 @@ void setup() {
       {
         Serial.println("Max stuck open count door reached ");
         Serial.printf("\n Putting ESP into a TIMER WAKEUP of %d secs. \n",(TIMER_SLEEP_MICROSECS/1000000) );
-        esp_sleep_enable_timer_wakeup(TIMER_SLEEP_MICROSECS); //lets go to sleep instead of GPIO wakeup
+        esp_sleep_enable_timer_wakeup(TIMER_SLEEP_MICROSECS); //lets go to TIMER Interrupt sleep instead of GPIO wakeup
         esp32_sleep();
       }
      else 
      {
       delay(5000);  //pause maybe stuck lid will close down    
       //Wake up when it goes high - may be inverted for your reed door sensors
-      esp_sleep_enable_ext0_wakeup(GPIO_INPUT_IO_TRIGGER,GPIO_DOOR_OPEN_STATE); //1 = High, 0 = Low  wake door OPEN (magnet 
-away sensor)
+      esp_sleep_enable_ext0_wakeup(GPIO_INPUT_IO_TRIGGER,GPIO_DOOR_OPEN_STATE); //1 = High, 0 = Low  wake door OPEN (magnet away sensor)
       esp32_sleep();
      }
     }
-  
-   stuckbootCount=0; //reset the stuckboot counter each time we get a clean GPIO wakeup
 
+
+  //was the door stuck open but now is closed.. re-set the door status send a message to indicate closed
+   if ( stuckbootCount > MAX_STUCK_BOOT_COUNT )
+     {
+        if (  connect_WIFI_MQTT() )
+         {
+           client.publish("/sensor/door", String(doorState).c_str(), false);  //false means don't retain messages
+           client.publish("/sensor/door_status",message_door_closed, false);  //text version of door
+          }
+        
+        stuckbootCount=0; //reset the stuckboot counter each time we get a clean GPIO wakeup
+
+     }
+
+     
   //Wake up when it goes high - may be inverted for your reed door sensors
-  esp_sleep_enable_ext0_wakeup(GPIO_INPUT_IO_TRIGGER,GPIO_DOOR_OPEN_STATE); //1 = High, 0 = Low  wake door OPEN (magnet away 
-sensor)
+  esp_sleep_enable_ext0_wakeup(GPIO_INPUT_IO_TRIGGER,GPIO_DOOR_OPEN_STATE); //1 = High, 0 = Low  wake door OPEN (magnet away sensor)
  
-  //Now wait for the state to change back to close.. 
-   pinMode(doorSensorPIN, INPUT);
   
   //Print the wakeup reason for ESP32
   print_wakeup_reason();
  
  if(doorState != GPIO_DOOR_CLOSED_STATE) //is the door NOT closed?
   {
-   //Now Setup WIFI and MQTT connections -   //ONLY IF DOOR IS OPENED otehrwise ignore
+   if (LED_ENABLED)
    digitalWrite(LED_BUILTIN, HIGH); // Turn the LED on
-  setup_wifi();
-  client.setServer(mqtt_server, 1883);
-
-  //Now do the normal LoopCode here
-  if (!client.connected()) {
-    reconnect();
-  }
-  client.loop();
+  
+   connect_WIFI_MQTT(); //connect to wifi and MQTT Broker
    
    //Now send the MQTT message  
    client.publish("/sensor/door", String(doorState).c_str(), false);  //false means don't retain messages
+   client.publish("/sensor/door_status",message_door_open, false);  //text version of door
    client.publish("/sensor/bootcount",String(bootCount).c_str(), false); 
    client.publish("/sensor/name", mqtt_clientid , false);  //client id
    client.publish("/sensor/rssi",String(rssi).c_str() , false);   // wifi rssi = signal strenght 0 - 100 , <-80 is poor
 
+   //if you have SMS enabled.. send out a message
+   send_SMS("You have mail"); //optional: send sms message - requires SMS service
+    
     long  n=0; //loop counter while door is opened
     while (doorState==GPIO_DOOR_OPEN_STATE)  //while where open
     {
       n++;
-      client.publish("/sensor/door_status","open", false); 
-      doorState = digitalRead(doorSensorPIN); //Read the pin
+      client.loop();  //call regularly to keep the connection to mqtt broker open
+       
+      doorState = digitalRead(doorSensorPIN); //Keep reading the door state
       
       // print out the state of the button:
       Serial.print(doorState);
+      
       long elapsed_time=(millis()-start_time); 
       
-      if (n%40==0)
-       Serial.printf(  "%ld ms \n",elapsed_time );  //print the time in ms
+      if (n%40==0)      //new line so it doens't scroll of the screen
+       Serial.printf(  "%ld ms \n",elapsed_time );  //print the time in every 40 cyclels 
       delay(50);        // delay in between reads for stability
 
 
       //If the door is still OPEN  after MAX_OPENDOOR_TIME time, assume its stuck open and just send a message
       if (elapsed_time > MAX_OPENDOOR_TIME)
         {
+         
           Serial.printf("\n Door STUCK OPEN for %ld ms > %d ms .. ending loop. ", elapsed_time,MAX_OPENDOOR_TIME );
-          client.publish("/sensor/door_status","stuck open?",false);
-          esp32_sleep();  
-          break; //exit this while Loop
+          //send_SMS("Mailbox stuffed- lid is open.");  //optional send message when mailbox is stuck open
+          client.publish("/sensor/door_status",message_door_stuck, false);  //text version of door
+              
+          break;
+          //code here not executed
         }
     }
 
-      
-      runtime(millis()-currentMillis +time_awake_millis ) ; //calculate total_time_awake  how long the door was opened in h:m:s
+      //calculate total_time_awake  how long the esp32 board was running
+      runtime(millis()-currentMillis +time_awake_millis ) ; 
       Serial.println("ESp32 total awaketime ::"+(String)total_time_awake);     
-      client.publish("/sensor/door", String(doorState).c_str(), false);  //don't retain messages
-      client.publish("/sensor/door_status","closed",false);
-      client.publish("/sensor/total_time_awake",total_time_awake,false);
-      
-      Serial.println("\n Pausing to give MQTT time to get message: Result of Publish: ");
-      delay(1000); //give MQTT broker a chance to get message -  before disconnecting wifi
-        
-    WiFi.disconnect();
-    Serial.println("\n Wifi Disconnected from : "+(String)wifi_ssid);
+       
+       if (doorState==LOW)  //only if the door is really closed , check in case we fell through while loop
+       client.publish("/sensor/door_status",message_door_closed,false);  //text version of /sensor/door
+       client.publish("/sensor/total_time_awake",total_time_awake,false);
+      int result= client.publish("/sensor/door", String(doorState).c_str(), false);  //door status
     
-    digitalWrite(LED_BUILTIN, LOW); // Turn the LED oFF   
+      delay(250); //give MQTT broker a chance to get message -  before disconnecting wifi
+   
+      client.disconnect();   //disconnect Mqtt broker
+      WiFi.disconnect();    //disconnect WiFi
+      Serial.println("\n Wifi Disconnected from : "+(String)wifi_ssid);
+  
+   if (LED_ENABLED)  
+    digitalWrite(LED_BUILTIN, LOW); // :: Turn the LED oFF   
   }
   else
   Serial.println("\n Door State Unchanged not triggering wifi");
