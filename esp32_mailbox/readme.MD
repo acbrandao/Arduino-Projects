@@ -61,7 +61,7 @@ Take the attached wifi_info_sample file and edit its settings to match your envi
 #define sms_api_key    "API_KEY"
 #define sms_api_secret "API_SECRET" 
 ```
-### Configuring the Mailbxo 
+### Configuring the mqtt_mailbox sketch 
 
 Optionally you can tweak these settings to better suit your needs:
 
