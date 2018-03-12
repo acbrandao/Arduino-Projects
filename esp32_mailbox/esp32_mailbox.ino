@@ -11,7 +11,7 @@
  * This example code is in the public domain.
  *
  *For full code explanation visit:
-  * http://www.abrandao.com/arduino_esp32_wifi_door_mailbox_sensor
+  * http://www.abrandao.com/2018/03/arduino_esp32_battery_wifi_door_mailbox_sensor
 */
 
 #include <WiFi.h>
