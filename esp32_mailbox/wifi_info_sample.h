@@ -12,7 +12,7 @@
 #define mqtt_user ""    //leave empty if none
 #define mqtt_password ""   //leave empty if none
 #define mqtt_clientid "ESP32 LoLin"  //Client id string for Mqtt broker
-#define mqtt_max_retries 10 //maximum number of times to retry mqtt server before aborting
+#define mqtt_max_retries 10 //maximum number of times to retry mqtt server before aborting 
 
 
 /* OPTIONAL:  but you can define a messaging service SMS such as twilio, nexmo, plivio etc.
