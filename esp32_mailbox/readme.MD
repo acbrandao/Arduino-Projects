@@ -3,6 +3,8 @@
 
 How I took my rusty old mailbox (literally)  and made it into smart mailbox (an IoT device) and in the process  how I  learned about Arduino and particularly  the ESP32 chip which lets us relatively easily  setup with minimal costs and complexity for a battery powered mailbox  notification system (and many other IoT projects) .
 
+This Sketch is for use with an Arduno ESP32 board, and a door sensor and it will communcate the door status and changes via a MQTT broker
+
 
 ## Getting Started
 
@@ -13,7 +15,8 @@ his project only requires a few items:
   * a door /window magnetic  (A reed switch), detects open/close state
   * a li-poly battery( or really any battery that can power thee ESP32)  and a few connecting wires with
   * a project box, to keep everything enclosed
-  *  plus a  tiny bit of soldering, some tape, adhesive putty   and that’s about it..
+  *  plus a  tiny bit of soldering, some tape, adhesive putty   and that’s about it
+  * a [ MQTT broker | https://www.hivemq.com/blog/mqtt-essentials-part-3-client-broker-connection-establishment ] such as Mosquitto (local) or HiveMQ cloud based , this is what receives the messsages ..
 
 ### Installing
 
@@ -28,8 +31,7 @@ in Arduino IDE – Include library PubSub : PubSub Client libraries, need for MQ
 
 Take the attached wifi_info_sample file and edit its settings to match your environment then save it as *wifi_info.h*
 
----
-
+```
 /* Rename this  "wifi_info_sample.h" file to "wifi_info.h"  
  *  customize below for your environment and save as your own wifi_info.h file in this same folder
  *  Inluded in a seperate file becasue of github upload
@@ -46,7 +48,6 @@ Take the attached wifi_info_sample file and edit its settings to match your envi
 #define mqtt_clientid "ESP32 LoLin"  //Client id string for Mqtt broker
 #define mqtt_max_retries 10 //maximum number of times to retry mqtt server before aborting
 
-
 /* OPTIONAL:  but you can define a messaging service SMS such as twilio, nexmo, plivio etc.
 * TO USE THIS FEATURe you NEED TO SiGNUP TO A SMS Service  then complete the section below
 * refer to their curl examplles
@@ -59,9 +60,7 @@ Take the attached wifi_info_sample file and edit its settings to match your envi
 #define sms_from       "VALID NEXMO NUMBER"   //some services require from their number like Twilio
 #define sms_api_key    "API_KEY"
 #define sms_api_secret "API_SECRET" 
-
----
-
+```
 ### Configuring the Mailbxo 
 
 Optionally you can tweak these settings to better suit your needs:
