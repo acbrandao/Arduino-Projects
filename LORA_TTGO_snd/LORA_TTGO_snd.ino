@@ -181,6 +181,7 @@ JsonObject& root = jsonBuffer.createObject();
    Serial.println("Message#: "+String(counter) );
 
     //Get GPS data
+    root["count"]=counter;
     get_GPS_data();
 
    if (newData)
@@ -392,7 +393,7 @@ Serial.println(gps.hdop.value()); // Horizontal Dim. of Precision (100ths-i32)
  }
 
 
-  void displayString(String title, String body)
+void displayString(String title, String body)
 {
   Serial.println("DisplayString...");
   
