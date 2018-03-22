@@ -35,6 +35,7 @@ char JSON[255];
 JsonObject& root = jsonBuffer.createObject();
 
 
+
 #include <SPI.h>
 #include <LoRa.h>       // https://github.com/sandeepmistry/arduino-LoRa
 #include <Wire.h>  // Only needed for Arduino 1.6.5 and earlier
@@ -66,7 +67,8 @@ SSD1306  display(0x3c, 4, 15);
 
 //Esp32 DeepSleep functions
 #define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP  30        /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SLEEP  15        /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SCAN  60        /* Time for the GPS sreach will go to sleep (in seconds) */
 
 RTC_DATA_ATTR int bootCount = 0;
 
@@ -154,45 +156,57 @@ void setup() {
 }
 
 void loop() {
+
+jsonBuffer.clear();
+JsonObject& root = jsonBuffer.createObject();
+
+  
   Serial.print("Sending packet: ");
   Serial.println(counter);
 
-  //Get GPS data
-  get_GPS_data();
-
+ 
 /*
  *  ESP32 board capabilities Hall sensor and temerature sensor
   
    int measurement = 0;
    measurement = hallRead();
    root["sensor_magnetic"]=String(measurement);
-*/
+
   //packet contents
    root["board_temp_f"]= temprature_sens_read();  //read the board temperature
-   root["counter"] = counter++;  //just indicate loop is moving
+
+   root["count"] = counter++;  //just indicate loop is moving
+*/
+    counter++;
    Serial.println("Message#: "+String(counter) );
+
+    //Get GPS data
+    get_GPS_data();
 
    if (newData)
       root["msg"] ="GPS "+(String)gps.satellites.value()+" x:"+(String)gps.satellites.age() ;
     else
-       root["msg"] ="M# "+(String)chars+":"+(String)counter;
+       root["msg"] ="M# "+(String)chars+": Aquiring";
+
+   
+    root.printTo(JSON);  //Now create a Serialized minified JSON string  
     
+    Serial.print("JSON buffer  size: ");
+    Serial.println(jsonBuffer.size());
     
-   root.printTo(JSON);  //Now create a Serialized minified JSON string  
-  
-  //  displayString("PACKET","Bulding");
+    //  displayString("PACKET","Bulding");
     LoRa.beginPacket();
     LoRa.print(JSON);  //print the entire JSON buffer to send
     LoRa.endPacket();
-  
     
+  
     char frequencyband[4];
     ltoa(FREQ,frequencyband,10);
     Serial.println("LoRa sent JSON: "+String(FREQ).substring(0,3)+"Mhz, Packet#:"+(String)counter );
     Serial.println(JSON);
 
   //After sending a bunch of JSON beacons lets sleep to conserve battery
-   if (counter % TIME_TO_SLEEP == 0)
+   if (counter % TIME_TO_SCAN == 0)
    {
 
      Serial.println("Conserver battery ging to sleep now for "+String(TIME_TO_SLEEP) +  " Seconds");
@@ -209,40 +223,10 @@ void loop() {
    delay(1000); //now lets pause a bit to save battery 
 }
 
-void displayString(String title, String body)
-{
-  Serial.println("DisplayString...");
-  
-  display.clear();  // clear the display
-  
-  display.setTextAlignment(TEXT_ALIGN_LEFT);
-  display.setFont(ArialMT_Plain_16);
-  display.drawString(0, 5,  title);  
-  
-  display.setTextAlignment(TEXT_ALIGN_LEFT);
-  display.setFont(ArialMT_Plain_24);
-  display.drawString(0, 20, body);
-
-  display.setFont(ArialMT_Plain_10);
-  display.setTextAlignment(TEXT_ALIGN_RIGHT);
-  display.drawString(128, 50, String(millis()/1000)+"s" );
-
-/*  Lora ESP32 board temperature
- *   display.setTextAlignment(TEXT_ALIGN_LEFT);
-  temp_farenheit= temprature_sens_read();
-  display.drawString(0, 50, "Radio:"+String(temp_farenheit)+"ºF" );
-*/  
-  // write the buffer to the display
-  display.display();
-  
-  delay(10);
-}
 
 
 void get_GPS_data()
 {
-
-
   // For one second we parse GPS data and report some key values
   for (unsigned long start = millis(); millis() - start < 1000;)
   {
@@ -297,6 +281,7 @@ void get_GPS_data()
       }
       else
       {
+        root["gps_date"]=(String)"Invalid Date";
       Serial.println(F("GPS DATE/TIME INVALID"));
       }
 
@@ -306,10 +291,10 @@ void get_GPS_data()
    sprintf(timestamp,"%02d:%02d:%02d",gps.time.hour(),gps.time.minute(),gps.time.second() );
    root["gps_time"]=(String)timestamp;
    Serial.println("GPS TIME: "+(String)timestamp );
-   
-   }
+     }
   else
   {
+     root["gps_time"]=(String)"Invalid Time";
     Serial.println(F("GPS TIMESTAMP INVALID"));
   }
     
@@ -322,9 +307,9 @@ void get_GPS_data()
   
  
   //Serial.printf(" CHARS=%s  SENTENCES=%s CSUM ERR=%s \n",gps.charsProcessed(),gps.sentencesWithFix(),gps.failedChecksum());
-  root["gps_sentence"]= gps.sentencesWithFix();
+ // root["gps_sentence"]= gps.sentencesWithFix();
   root["gps_chars"]= gps.charsProcessed();
-  root["gps_checksum"]= gps.failedChecksum();
+  //root["gps_ksum"]= gps.failedChecksum();
   
  if (gps.charsProcessed() < 10)
       Serial.println("WARNING: No GPS data.  Check wiring.");
@@ -405,4 +390,34 @@ Serial.print("Horizontal Dim. of Precision (100ths) ):");
 Serial.println(gps.hdop.value()); // Horizontal Dim. of Precision (100ths-i32)
 
  }
+
+
+  void displayString(String title, String body)
+{
+  Serial.println("DisplayString...");
   
+  display.clear();  // clear the display
+  
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.setFont(ArialMT_Plain_16);
+  display.drawString(0, 5,  title);  
+  
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.setFont(ArialMT_Plain_24);
+  display.drawString(0, 20, body);
+
+  display.setFont(ArialMT_Plain_10);
+  display.setTextAlignment(TEXT_ALIGN_RIGHT);
+  display.drawString(128, 50, String(millis()/1000)+"s" );
+
+/*  Lora ESP32 board temperature
+ *   display.setTextAlignment(TEXT_ALIGN_LEFT);
+  temp_farenheit= temprature_sens_read();
+  display.drawString(0, 50, "Radio:"+String(temp_farenheit)+"ºF" );
+*/  
+  // write the buffer to the display
+  display.display();
+  
+  delay(10);
+}
+
