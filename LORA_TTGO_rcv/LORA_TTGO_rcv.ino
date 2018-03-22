@@ -165,7 +165,7 @@ static  int errorcount=0,packetcount=0;
       bool gps_signal=root["gps_signal"];
       int gps_sats=root["gps_sats"];
       int gps_alt_feet=root["gps_alt_ft"];
-      long counter = root["counter"];
+      long counter = root["count"];
       float gps_lat=root["gps_lat"];
       float gps_long=root["gps_long"];
       int gps_sentences= root["gps_sentence"];
@@ -195,7 +195,7 @@ static  int errorcount=0,packetcount=0;
          {
           
           const char* utcTime= root["gps_time"];
-         displayString("NO GPS: "+(String)gps_chars,String(utcTime));
+         displayString("NO GPS: "+(String)gps_chars,String(utcTime)+" "+String(counter) );
          
          }
       } //success JSON parse
