@@ -30,8 +30,8 @@ static const uint32_t GPSBaud = 9600;
  *  */
  
 #include <ArduinoJson.h>  //https://arduinojson.org/doc/encoding/ 
-StaticJsonBuffer<200> jsonBuffer;  //Define JSON buffer used by ARduinojSON
-char JSON[200];
+StaticJsonBuffer<255> jsonBuffer;  //Define JSON buffer used by ARduinojSON
+char JSON[255];
 JsonObject& root = jsonBuffer.createObject();
 
 
@@ -59,13 +59,14 @@ SSD1306  display(0x3c, 4, 15);
 #define LORA_CS 18     // GPIO18 -   SX1276 CS
 #define LORA_RST 14   // GPIO14 -    SX1276 RST
 #define LORA_IRQ 26  // GPIO26 -     SX1276 IRQ (interrupt request)
-#define LORA_SpreadingFactor  7 // ranges from 6-12, default 7 see API docs larger more range less data rate
+#define LORA_SpreadingFactor  10 // ranges from 6-12, default 7 see API docs larger more range less data rate
+#define LORA_TX_Power  17  // - TX power in dB, defaults to 17
 #define FREQ 915E6  //Define Lora Frequency depens on Regional laws usually 433E6 , 866E8 or 915E6
 #define BEACON_INTERVAL 15*1000  //Define how often to sen out the lora signal 
 
 //Esp32 DeepSleep functions
 #define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP  10        /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SLEEP  30        /* Time ESP32 will go to sleep (in seconds) */
 
 RTC_DATA_ATTR int bootCount = 0;
 
@@ -148,7 +149,7 @@ void setup() {
   // Most modules have the PA output pin connected to PA_BOOST, gain 2-17
   // TTGO and some modules are connected to RFO_HF, gain 0-14
   // If your receiver RSSI is very weak and little affected by a better antenna, change this!
-  LoRa.setTxPower(14, PA_OUTPUT_RFO_PIN);
+  LoRa.setTxPower(LORA_TX_Power, PA_OUTPUT_RFO_PIN);
   
 }
 
@@ -290,26 +291,26 @@ void get_GPS_data()
       if (gps.date.isValid())
       {
       char datetime[16];
-     // sprintf(datetime,"%d/%d/%d",gps.date.month(),gps.date.day(),gps.date.year() );
-     // root["gps_date"]= datetime;
-     // Serial.println("GPS DATE: "+String(datetime));
+       sprintf(datetime,"%02d/%02d/%02d",gps.date.month(),gps.date.day(),gps.date.year() );
+       root["gps_date"]=(String)datetime;
+       Serial.println("GPS DATE: "+String(datetime));
       }
       else
       {
-      Serial.print(F("GPS DATE/TIME INVALID"));
+      Serial.println(F("GPS DATE/TIME INVALID"));
       }
 
   if (gps.time.isValid())
   {
-  //  char timestamp[16];
-  //  sprintf(timestamp,"%s:%s:%s",gps.time.hour(),gps.time.minute(),gps.time.second() );
-  //  root["gps_time"]= timestamp;
-   // Serial.println("GPS TIME: "+String(timestamp) );
+    char timestamp[16];
+   sprintf(timestamp,"%02d:%02d:%02d",gps.time.hour(),gps.time.minute(),gps.time.second() );
+   root["gps_time"]=(String)timestamp;
+   Serial.println("GPS TIME: "+(String)timestamp );
    
    }
   else
   {
-    Serial.print(F("GPS TIMESTAMP INVALID"));
+    Serial.println(F("GPS TIMESTAMP INVALID"));
   }
     
    

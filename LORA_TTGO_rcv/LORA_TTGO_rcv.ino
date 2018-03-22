@@ -34,7 +34,7 @@ SSD1306  display(0x3c, 4, 15);
 #define LORA_CS 18     // GPIO18 -   SX1276 CS
 #define LORA_RST 14   // GPIO14 -    SX1276 RST
 #define LORA_IRQ 26  // GPIO26 -     SX1276 IRQ (interrupt request)
-#define LORA_SpreadingFactor  7 // ranges from 6-12, default 7 see API docs larger more range less data rate
+#define LORA_SpreadingFactor  10 // ranges from 6-12, default 7 see API docs larger more range less data rate
 #define FREQ 915E6  //Define Lora Frequency depens on Regional laws usually 433E6 , 866E8 or 915E6
 
 #ifdef __cplusplus
@@ -48,9 +48,7 @@ uint8_t temprature_sens_read();
 }
 #endif
 
-
-
- String rssi = "";
+ String rssi = "???";
 String packet = "";
 
 uint8_t temp_farenheit;
@@ -69,27 +67,23 @@ void setup() {
   
   pinMode(16,OUTPUT);
   digitalWrite(16, LOW);    // set GPIO16 low to reset OLED
-  delay(50); 
+  delay(25); 
   digitalWrite(16, HIGH); // while OLED is running, must set GPIO16 in high
   
   Serial.begin(115200);
-  Serial.println();
-  Serial.println();
-
-
-  // Initialising the UI will init the display too.
+   // Initialising the UI will init the display too.
   display.init();
   display.flipScreenVertically();
   displayString("LoRa RECV","Frequency "+String(FREQ) );  
-   Serial.println("LoRa Receiver");
+   Serial.println("LoRa Receiver Ready");
    
  // Very important for SPI pin configuration!
   SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS); 
   
   // Very important for LoRa Radio pin configuration! 
   LoRa.setPins(LORA_CS, LORA_RST, LORA_IRQ);         
-
-  displayString("LoRa RCV","waiting...");
+ Serial.println("LoRa Receiver : Listening on "+String(FREQ)+"Mhz");
+  displayString("LoRaRCV "+String(FREQ).substring(0,3)+"Mhz","listening...");
 
 
   if (!LoRa.begin(FREQ)) {
@@ -101,107 +95,115 @@ void setup() {
   // The larger the spreading factor the greater the range but slower data rate
   // Send and receive radios need to be set the same
   LoRa.setSpreadingFactor(LORA_SpreadingFactor);  // ranges from 6-12, default 7 see API docs
-
-  
+ 
 }
 
 void loop() {
 
-static  int errorcount=0;
+static  int errorcount=0,packetcount=0;
+
  // try to parse packet
-  int packetSize = LoRa.parsePacket();
-  if (packetSize) 
-  {
-    // received a packet
-    
-    Serial.print("Received packet '");
-   //displayString("Packet","RCVD "+String(packetSize)+"bytes" );
-
-    // read packet
-    packet="";                   // Clear packet
-    while (LoRa.available()) {
-      packet += (char)LoRa.read(); // Assemble new packet
-    }
-
-    //try to convert to JSON object
-     JsonObject& root = jsonBuffer.parseObject(packet.c_str());
-    //root  = jsonBuffer.parseObject(packet.c_str());
-
-
-   //too many errors
-   if (errorcount==10)
-   {
-      Serial.println("Restarting too many errors.");
-      ESP.restart();
-   }
-        
-   if (!root.success()) {
-      // Parsing failed :-(
-         Serial.println("** FAILED**  JSON BAD  packet\n '"+String(packet )+" Size:"+(String)packetSize);
-          displayString("Bad Packet - offline?","Size: "+(String)packetSize );
-          errorcount++;
-     }
-    else
-    {
-       rssi = LoRa.packetRssi();
-
-  
-    /* Availab jSON VALUES from LRA_TTGO_snd
-     *  
-     *  
-    root["gps_signal"]= true | false // d we have a vlaid signal
-    root["gps_fix_age"]=gps.location.age(); //age() , eturns ms since its last update
-    root["gps_sats"]=gps.satellites.value(); //number of sats
-    root["gps_mph"]= gps.speed.mph(); //ground speed in mph
-    root["gps_course"]= gps.course.deg(); //ground course in 
-    root["gps_alt_ft"]= alttiude in feet
-    root["gps_lat"] =gps.location.lat();
-    root["gps_long"] =gps.location.lng();
-    root["gps_date"] = m/d/yyyy gps date
-    root["gps_time"] = hh:mm:ss 
-    root["gps_sentence"] = number of valid NMEA Gps sentence strings
-     root["gps_chars"] = number of valid NMEA Gps sentence strings
-     root["gps_checksum"] = passed of failed based on NMEA string
-     */
    
-    // Extract JSON Info
-    const char* temp= root["temp"];
-    const char* msg= root["msg"];
-    bool gps_signal=root["gps_signal"];
-    int gps_sats=root["gps_sats"];
-    int gps_alt_feet=root["gps_alt_ft"];
-    long counter = root["counter"];
-    float gps_lat=root["gps_lat"];
-    float gps_long=root["gps_long"];
-    int gps_sentences= root["gps_sentence"];
-    int gps_chars= root["gps_chars"];
-    int gps_mph=root["gps_mph"];
-    int gps_course=root["gps_course"];
-    long gps_fix_age=root["gps_fix_age"];
+  int packetSize = LoRa.parsePacket();
+ 
+  if (packetSize)     // received a packet
+  {
+      rssi = LoRa.packetRssi();
+      
+      Serial.print("Received packet '");
+     //displayString("Packet","RCVD "+String(packetSize)+"bytes" );
   
-    Serial.println("LoRa Receiver");
-    Serial.println("Received packet:");
-    Serial.println("    '" + packet + "'");
-    Serial.println("RSSI " + rssi);
+      // read packet
+      packet="";                   // Clear packet
+       while (LoRa.available()) 
+      {
+        packet += (char)LoRa.read(); // Assemble new packet
+        
+      }
+  
+       packetcount++;
+      //try to convert to JSON object
+       JsonObject& root = jsonBuffer.parseObject(packet.c_str());
+      //root  = jsonBuffer.parseObject(packet.c_str());
+          
+     if (!root.success()) 
+      {
+        // Parsing failed :-(
+           Serial.println("** FAILED**  JSON BAD  packet\n '"+String(packet )+" Size:"+(String)packetSize);
+            displayString("Bad JSON "+String(packetcount),"Size: "+(String)packetSize );
+            errorcount++;
+                      
+               //too many errors
+               if (errorcount>10)
+               {
+                  Serial.println("Restarting too many errors.");
+                  ESP.restart();
+                  return;
+               }
+       } //if INvalid JSON Pakcet
+      else
+      {
+      /* Availab jSON VALUES from LRA_TTGO_snd
+      root["gps_signal"]= true | false // d we have a vlaid signal
+      root["gps_fix_age"]=gps.location.age(); //age() , eturns ms since its last update
+      root["gps_sats"]=gps.satellites.value(); //number of sats
+      root["gps_mph"]= gps.speed.mph(); //ground speed in mph
+      root["gps_course"]= gps.course.deg(); //ground course in 
+      root["gps_alt_ft"]= alttiude in feet
+      root["gps_lat"] =gps.location.lat();
+      root["gps_long"] =gps.location.lng();
+      root["gps_date"] = m/d/yyyy gps date
+      root["gps_time"] = hh:mm:ss 
+      root["gps_sentence"] = number of valid NMEA Gps sentence strings
+       root["gps_chars"] = number of valid NMEA Gps sentence strings
+       root["gps_checksum"] = passed of failed based on NMEA string
+       */
+     
+      // Extract JSON Info
+      const char* temp= root["temp"];
+      const char* msg= root["msg"];
+      bool gps_signal=root["gps_signal"];
+      int gps_sats=root["gps_sats"];
+      int gps_alt_feet=root["gps_alt_ft"];
+      long counter = root["counter"];
+      float gps_lat=root["gps_lat"];
+      float gps_long=root["gps_long"];
+      int gps_sentences= root["gps_sentence"];
+      int gps_chars= root["gps_chars"];
+      int gps_mph=root["gps_mph"];
+      int gps_course=root["gps_course"];
+      long gps_fix_age=root["gps_fix_age"];
     
-    Serial.println(packet + "' with RSSI " + rssi);     
-    char frequencyband[4];
-     ltoa(FREQ,frequencyband,10);
+      Serial.println("LoRa Receiver");
+      Serial.println("Received packet:");
+      Serial.println("    '" + packet + "'");
+      Serial.println("RSSI " + rssi);
+      
+      Serial.println(packet + "' with RSSI " + rssi);     
+      char frequencyband[4];
+       ltoa(FREQ,frequencyband,10);
 
-   if ( gps_signal )
-    {
-     //convert lat long to dispalyable string9
-    String flat =(String)gps_lat;
-    String flong =(String)gps_long;
-    String LatLong= flat.substring(0,4)+" "+flong.substring(0,4); 
-    displayString("GPS:"+(String)gps_sats+"  A:"+(String)gps_alt_feet+" ft",(String)gps_mph+ "MPH C" +(String)gps_course );
+     if ( gps_signal )
+        {
+         //convert lat long to dispalyable string9
+        String flat =(String)gps_lat;
+        String flong =(String)gps_long;
+        String LatLong= flat.substring(0,4)+" "+flong.substring(0,4); 
+        displayString("GPS:"+(String)gps_sats+"  A:"+(String)gps_alt_feet+" ft",(String)gps_mph+ "MPH C" +(String)gps_course );
+        }
+     else
+         {
+          
+          const char* utcTime= root["gps_time"];
+         displayString("NO GPS: "+(String)gps_chars,String(utcTime));
+         
+         }
+      } //success JSON parse
     }
-   else
-   displayString("NO GPS: "+(String)gps_chars,"Search.. "+String(counter));
-  
-    } //success JSON parse
-  }
-}
+  // else
+  // displayString("NO LoRa SIGNAL"+(String)packetcount,"Listening...");
+
+} //end of loop()
 
 void displayString(String title, String body)
 {
@@ -216,14 +218,15 @@ void displayString(String title, String body)
     display.setTextAlignment(TEXT_ALIGN_LEFT);
     display.drawStringMaxWidth(0, 20, 128,body );
 
+  //bottom right clock
   display.setFont(ArialMT_Plain_10);
   display.setTextAlignment(TEXT_ALIGN_RIGHT);
   display.drawString(128, 50, String(TimeToString(millis()/1000) ) );
 
-
+  //bottom left rssi
  display.setTextAlignment(TEXT_ALIGN_LEFT);
   temp_farenheit= temprature_sens_read();
-  display.drawString(0, 50, "RSSI :"+String(  LoRa.packetRssi() ) );
+  display.drawString(0, 50, "RSSI :"+(String)rssi );
   
   // write the buffer to the display
   display.display();
