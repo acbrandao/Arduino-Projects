@@ -11,7 +11,8 @@ DynamicJsonBuffer jsonBuffer;
 #include <SPI.h>
 #include <LoRa.h>       // https://github.com/sandeepmistry/arduino-LoRa
 #include <Wire.h>  // Only needed for Arduino 1.6.5 and earlier
-#include "SSD1306.h" // alias for `#include "SSD1306Wire.h"
+#include <SSD1306.h>
+//#include "SSD1306.h" // alias for `#include "SSD1306Wire.h"
 
 //OLED pins to ESP32 GPIOs via this connecthin:
 //OLED_SDA -- GPIO4
@@ -106,6 +107,7 @@ void setup() {
 
 void loop() {
 
+static  int errorcount=0;
  // try to parse packet
   int packetSize = LoRa.parsePacket();
   if (packetSize) 
@@ -126,10 +128,18 @@ void loop() {
     //root  = jsonBuffer.parseObject(packet.c_str());
 
 
+   //too many errors
+   if (errorcount==10)
+   {
+      Serial.println("Restarting too many errors.");
+      ESP.restart();
+   }
+        
    if (!root.success()) {
       // Parsing failed :-(
          Serial.println("** FAILED**  JSON BAD  packet\n '"+String(packet )+" Size:"+(String)packetSize);
-          displayString("PAcket","BAD PACKET "+(String)packetSize );
+          displayString("Bad Packet - offline?","Size: "+(String)packetSize );
+          errorcount++;
      }
     else
     {
@@ -144,6 +154,11 @@ void loop() {
     float gps_lat=root["gps_lat"];
     float gps_long=root["gps_long"];
     int gps_sentences= root["gps_sentence"];
+    int gps_mph=root["gps_mph"];
+    int gps_bearing=root["gps_bearing"];
+
+    
+    
     /* Available json values
      *  
      *  
@@ -180,22 +195,18 @@ void loop() {
     String flat =(String)gps_lat;
     String flong =(String)gps_long;
     String LatLong= flat.substring(0,4)+" "+flong.substring(0,4); 
-    displayString("GPS FIX#: Sats"+(String)gps_sats, "Coord:"+(String)LatLong + (String)counter );
+    displayString("GPS Sat:"+(String)gps_sats+" "+(String)counter, "MPH "+(String)gps_mph + " H" +(String)gps_bearing );
     }
    else
    displayString("GPS MSG: "+(String)gps_sentences, (String)msg+ (String)counter );
   
     } //success JSON parse
-  
   }
-
-  
 }
 
 void displayString(String title, String body)
 {
  
-  
   display.clear();  // clear the display
   
   display.setTextAlignment(TEXT_ALIGN_LEFT);
@@ -208,7 +219,7 @@ void displayString(String title, String body)
 
   display.setFont(ArialMT_Plain_10);
   display.setTextAlignment(TEXT_ALIGN_RIGHT);
-  display.drawString(128, 50, String(millis()/1000)+"s" );
+  display.drawString(128, 50, String(TimeToString(millis()/1000) ) );
 
 
  display.setTextAlignment(TEXT_ALIGN_LEFT);
@@ -219,4 +230,18 @@ void displayString(String title, String body)
   display.display();
   
   delay(10);
+}
+
+// t is time in seconds = millis()/1000;
+char * TimeToString(unsigned long t)
+{
+ static char str[12];
+ 
+ long h = t / 3600;
+ long d = h / 24;
+ t = t % 3600;
+ int m = t / 60;
+ int s = t % 60;
+ sprintf(str, "%02ld:%02ld:%02d:%02d", d, h, m, s);
+ return str;
 }
