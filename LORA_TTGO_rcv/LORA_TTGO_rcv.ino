@@ -195,7 +195,7 @@ static  int errorcount=0;
     String flat =(String)gps_lat;
     String flong =(String)gps_long;
     String LatLong= flat.substring(0,4)+" "+flong.substring(0,4); 
-    displayString("GPS Sat:"+(String)gps_sats+" "+(String)counter, "MPH "+(String)gps_mph + " H" +(String)gps_bearing );
+    displayString("GPS Sat:"+(String)gps_sats+" "+(String)counter,(String)gps_mph+ "MPH H" +(String)gps_bearing );
     }
    else
    displayString("GPS MSG: "+(String)gps_sentences, (String)msg+ (String)counter );
@@ -242,6 +242,6 @@ char * TimeToString(unsigned long t)
  t = t % 3600;
  int m = t / 60;
  int s = t % 60;
- sprintf(str, "%02ld:%02ld:%02d:%02d", d, h, m, s);
+ sprintf(str, "%%02ld:%02dm:%02ds",  h, m, s);
  return str;
 }
