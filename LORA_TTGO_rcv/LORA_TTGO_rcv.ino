@@ -194,10 +194,10 @@ static  int errorcount=0;
     String flat =(String)gps_lat;
     String flong =(String)gps_long;
     String LatLong= flat.substring(0,4)+" "+flong.substring(0,4); 
-    displayString("GPS:"+(String)gps_sats+" Alt:"+(String)gps_alt_feet,(String)gps_mph+ "MPH C" +(String)gps_course );
+    displayString("GPS:"+(String)gps_sats+"  A:"+(String)gps_alt_feet+" ft",(String)gps_mph+ "MPH C" +(String)gps_course );
     }
    else
-   displayString("NO GPS: "+(String)gps_chars, (String)msg+ (String)counter );
+   displayString("NO GPS: "+(String)gps_chars,"Search.. "+String(counter));
   
     } //success JSON parse
   }
