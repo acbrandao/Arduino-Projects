@@ -1,25 +1,37 @@
-/* Example from Sandeep Mistry 
- * With mods from AliExpress/LilyGo docs
- * For TTGo ESP32 LoRa-OLED board
+/* 
+ *  LoRA TTGO Sender: Sends Lora RAdio encoded in JSON  of sensor data. This code is setup
+ *  to use a GPS sensor data.
+ *  
+ *  Hardware: Lora ESP32 TTgo Board
+ *  Dependencies: (GPS Sensor) TinyGPS++ https://github.com/mikalhart/TinyGPSPlus
+ *  OLED requires alias for `#include "SSD1306Wire.h"
+ *  LORA Radio   https://github.com/sandeepmistry/arduino-LoRa
+ *   *  Example from Sandeep Mistry with mods from AliExpress/LilyGo docs  TTGo ESP32 LoRa-OLED board
  * http://www.lilygo.cn/down_view.aspx?TypeId=11&Id=78&Fid=t14:11:14
  * Based on SX1276 LoRa Radio
  * http://www.semtech.com/apps/product.php?pn=SX1276
  * RMB 29Nov2017
  */
-#include <TinyGPS.h>
-TinyGPS gps;
+#include <TinyGPS++.h>
+// The TinyGPS++ object
+TinyGPSPlus gps;
 
-// note: ESp32 uses hardware serial not Softwareserial.h , function as .avaialble() and read() are the same
+/* note: ESp32 uses hardware serial not Softwareserial.h , 
+ *  function as .avaialble() and read() perform the same thing  */
+
 HardwareSerial hSerial(1);
-static const int RXPin = 34, TXPin = 35;
+static const int RXPin = 34, TXPin = 35;  //GPS Module TX and RX Pins attached to change as needed
 static const uint32_t GPSBaud = 9600;
 
 #include <time.h>
 #include <sys/time.h>
 
+/* ArduinoJson  Helps us create a convient JSON, may be too large for LoRA consider reducing
+ *  */
+ 
 #include <ArduinoJson.h>  //https://arduinojson.org/doc/encoding/ 
-StaticJsonBuffer<200> jsonBuffer;  //Define JSON buffer used by ARduinojSON
-char JSON[200];
+StaticJsonBuffer<256> jsonBuffer;  //Define JSON buffer used by ARduinojSON
+char JSON[256];
 JsonObject& root = jsonBuffer.createObject();
 
 
@@ -94,7 +106,6 @@ void setup() {
    //Increment boot number and print it every reboot
   ++bootCount;
   Serial.println("Boot number: " + String(bootCount));
-
   
   esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
   Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP) +
@@ -109,12 +120,7 @@ void setup() {
   digitalWrite(16, HIGH); // while OLED is running, must set GPIO16 in high
   
   Serial.begin(115200);
-
-
-  Serial.println();
-  Serial.println();
-
-
+  
   // Initialising the UI will init the display too.
   display.init();
   display.flipScreenVertically();
@@ -127,27 +133,22 @@ void setup() {
   // Very important for LoRa Radio pin configuration! 
   LoRa.setPins(LORA_CS, LORA_RST, LORA_IRQ);         
 
-  //pinMode(blueLED, OUTPUT); // For LED feedback
-
-
   if (!LoRa.begin(FREQ)) {
     Serial.println("Starting LoRa failed!");
     displayString("TTGO LORA", "Failed");
-
     while (1);
   }
   
   // The larger the spreading factor the greater the range but slower data rate
   // Send and receive radios need to be set the same
   LoRa.setSpreadingFactor(LORA_SpreadingFactor); // ranges from 6-12, default 7 see API docs
-    displayString("LORA SFactor", (String) LORA_SpreadingFactor );
 
   // Change the transmit power of the radio
   // Default is LoRa.setTxPower(17, PA_OUTPUT_PA_BOOST_PIN);
   // Most modules have the PA output pin connected to PA_BOOST, gain 2-17
   // TTGO and some modules are connected to RFO_HF, gain 0-14
   // If your receiver RSSI is very weak and little affected by a better antenna, change this!
-  LoRa.setTxPower(17, PA_OUTPUT_RFO_PIN);
+  LoRa.setTxPower(14, PA_OUTPUT_RFO_PIN);
   
 }
 
@@ -155,28 +156,25 @@ void loop() {
   Serial.print("Sending packet: ");
   Serial.println(counter);
 
-  digitalWrite(blueLED, ON);  // Turn blue LED on
-  
-
   //Get GPS data
    get_GPS_data();
 
-  //packet contents
-   temp_farenheit= temprature_sens_read();  //read the board temperature
+/*
+ *  ESP32 board capabilities Hall sensor and temerature sensor
+  
    int measurement = 0;
    measurement = hallRead();
-
-    counter++;  //bump up the loop count
-   root["sensor_temp"] = String(temp_farenheit)+"ºF" ;
-   root["counter"] = counter;
    root["sensor_magnetic"]=String(measurement);
-
+*/
+  //packet contents
+   root["board_temp_f"]= temprature_sens_read();  //read the board temperature
+   root["counter"] = counter++;  //just indicate loop is moving
    Serial.println("Message#: "+String(counter) );
 
    if (newData)
-      root["msg"] ="GPS "+(String)gps.satellites() ;
+      root["msg"] ="GPS "+(String)gps.satellites.value()+" x:"+(String)gps.satellites.age() ;
     else
-       root["msg"] ="M# "+(String)chars+" ";
+       root["msg"] ="M# "+(String)chars+":"+(String)counter;
     
     
    root.printTo(JSON);  //Now create a Serialized minified JSON string  
@@ -186,29 +184,23 @@ void loop() {
     LoRa.print(JSON);  //print the entire JSON buffer to send
     LoRa.endPacket();
   
-  digitalWrite(blueLED, OFF); // Turn blue LED off
- 
- 
-  
-   char frequencyband[4];
-   ltoa(FREQ,frequencyband,10);
+    
+    char frequencyband[4];
+    ltoa(FREQ,frequencyband,10);
     Serial.println("LoRa sent JSON: "+String(FREQ).substring(0,3)+"Mhz, Packet#:"+(String)counter );
-      Serial.println(JSON);
+    Serial.println(JSON);
 
-  //After sending a bunch of JSON beacons lets sleep to conserver battery
+  //After sending a bunch of JSON beacons lets sleep to conserve battery
    if (counter % TIME_TO_SLEEP == 0)
    {
 
      Serial.println("Conserver battery ging to sleep now for "+String(TIME_TO_SLEEP) +  " Seconds");
      root["msg"]="Sleep "+(String)TIME_TO_SLEEP ;
      root.printTo(JSON);  //Now create a Serialized minified JSON string  
- 
-     LoRa.beginPacket();
+      LoRa.beginPacket();
      LoRa.print(JSON);  //print the entire JSON buffer to send
      LoRa.endPacket();
-     delay(1000); //give radio some time to send it out
-     
-     esp_deep_sleep_start();
+      esp_deep_sleep_start();
     
    }
 
@@ -234,10 +226,11 @@ void displayString(String title, String body)
   display.setTextAlignment(TEXT_ALIGN_RIGHT);
   display.drawString(128, 50, String(millis()/1000)+"s" );
 
-  display.setTextAlignment(TEXT_ALIGN_LEFT);
+/*  Lora ESP32 board temperature
+ *   display.setTextAlignment(TEXT_ALIGN_LEFT);
   temp_farenheit= temprature_sens_read();
   display.drawString(0, 50, "Radio:"+String(temp_farenheit)+"ºF" );
-  
+*/  
   // write the buffer to the display
   display.display();
   
@@ -267,50 +260,147 @@ void get_GPS_data()
 
   if (newData)
   {
-    unsigned long fix_age, time, date, speed, course;
-    float flat, flon;
-    unsigned long age;
-    gps.f_get_position(&flat, &flon, &age);
-    Serial.print("LAT=");
-    Serial.print(flat == TinyGPS::GPS_INVALID_F_ANGLE ? 0.0 : flat, 6);
-    Serial.print(" LON=");
-    Serial.print(flon == TinyGPS::GPS_INVALID_F_ANGLE ? 0.0 : flon, 6);
-    Serial.print(" SAT=");
-    Serial.print(gps.satellites() == TinyGPS::GPS_INVALID_SATELLITES ? 0 : gps.satellites());
-    Serial.print(" PREC=");
-    Serial.print(gps.hdop() == TinyGPS::GPS_INVALID_HDOP ? 0 : gps.hdop());
-
-
-      
-     // returns speed in 100ths of a knot
-    speed = gps.speed();
-       
-      // course in 100ths of a degree
-    course = gps.course();
+    printfullGPSdata();  //optional used for debugging and testing
+    
+    Serial.print(F("Location: "));   //Valid Location data 
+    if (gps.location.isValid())
+    {
+    Serial.print(gps.location.lat(), 6);
+    Serial.print(F(","));
+    Serial.print(gps.location.lng(), 6);
+    Serial.println();
     root["gps_signal"]= true;
-    root["gps_age"]=age;
-    root["gps_sats"]=gps.satellites();
-    root["gps_speed"]= speed;
-    root["gps_course"]= course;
-    root["gps_lat"] =flat;
-    root["gps_long"] =flon;
+    root["gps_fix_age"]=gps.location.age(); //age() method, which returns the number of milliseconds since its last update
+    root["gps_sats"]=gps.satellites.value();
+    root["gps_mph"]= gps.speed.mph();
+    root["gps_course"]= gps.course.deg();
+    root["gps_alt_ft"]= gps.altitude.feet();
+    root["gps_lat"] =gps.location.lat();
+    root["gps_long"] =gps.location.lng();
+  
+    }
+    else
+    {
+    Serial.print(F("GPS Location NOT AVAILABLE"));
+    }
+
+    //valid timestamp data
+       Serial.print(F("  Date/Time: "));
+      if (gps.date.isValid())
+      {
+      char datetime[16];
+      sprintf(datetime,"%d/%d/%d",gps.date.month(),gps.date.day(),gps.date.year() );
+      root["gps_date"]= datetime;
+      Serial.println("GPS DATE: "+String(datetime));
+      }
+      else
+      {
+      Serial.print(F("GPS DATE/TIME INVALID"));
+      }
+
+  if (gps.time.isValid())
+  {
+    char timestamp[12];
+    sprintf(timestamp,"%dh:%dm:/%ds",gps.time.hour(),gps.time.minute(),gps.time.second() );
+    root["gps_time"]= timestamp;
+    Serial.println("GPS TIME: "+String(timestamp) );
+   
+   }
+  else
+  {
+    Serial.print(F("GPS TIMESTAMP INVALID"));
+  }
+    
+   
    }
    else
    {
    root["gps_signal"]= false;
-   root["gps_sentence"]= (String)sentences;
-   root["gps_checksum"]= failed;
    }
   
-  gps.stats(&chars, &sentences, &failed);
-  Serial.print(" CHARS=");
-  Serial.print(chars);
-  Serial.print(" SENTENCES=");
-  Serial.print(sentences);
-  Serial.print(" CSUM ERR=");
-  Serial.println(failed);
-  if (chars == 0)
-    Serial.println("** No characters received from GPS: check wiring **");
-    
+ 
+  Serial.printf(" CHARS=%s  SENTENCES=%s CSUM ERR=%s \n",gps.charsProcessed(),gps.sentencesWithFix(),gps.failedChecksum());
+  root["gps_sentence"]= gps.sentencesWithFix();
+  root["gps_chars"]= gps.charsProcessed();
+  root["gps_checksum"]= gps.failedChecksum();
+  
+ if (gps.charsProcessed() < 10)
+      Serial.println("WARNING: No GPS data.  Check wiring.");
+
  } //end of function
+
+ void  printfullGPSdata()
+ {
+Serial.print("TinyGPSPlus Version: ");
+Serial.println(TinyGPSPlus::libraryVersion()); 
+Serial.println("-------------------------------------");
+Serial.print("Latitude : ");
+Serial.println(gps.location.lat(), 6); // Latitude in degrees (double)
+Serial.print("Longitude : ");
+Serial.println(gps.location.lng(), 6); // Longitude in degrees (double)
+Serial.print("Latitude  +/-:");
+Serial.print(gps.location.rawLat().negative ? "-" : "+");
+Serial.print("Raw latitude in whole degrees: ");
+Serial.println(gps.location.rawLat().deg); // Raw latitude in whole degrees
+// Serial.println(gps.location.rawLat().billionths);// ... and billionths (u16/u32)
+Serial.print("longitude  +/-:");
+Serial.print(gps.location.rawLng().negative ? "-" : "+");
+Serial.print("Raw longitude in whole degrees: ");
+Serial.println(gps.location.rawLng().deg); // Raw longitude in whole degrees
+Serial.println("------| TIME   |------------------------------");
+
+//Serial.println(gps.location.rawLng().billionths);// ... and billionths (u16/u32)
+Serial.print("Raw date in DDMMYY format: ");
+Serial.println(gps.date.value()); // Raw date in DDMMYY format (u32)
+Serial.print("Month (1-12): ");
+Serial.println(gps.date.year()); // Year (2000+) (u16)
+Serial.print("");
+Serial.println(gps.date.month()); // Month (1-12) (u8)
+Serial.print("Day (1-31): ");
+Serial.println(gps.date.day()); // Day (1-31) (u8)
+Serial.print(" Raw time in HHMMSSCC format : ");
+Serial.println(gps.time.value()); // Raw time in HHMMSSCC format (u32)
+Serial.print("Hour (0-23) : ");
+Serial.println(gps.time.hour()); // Hour (0-23) (u8)
+Serial.print("Minute (0-59) : ");
+Serial.println(gps.time.minute()); // Minute (0-59) (u8)
+Serial.print("Second (0-59) : ");
+Serial.println(gps.time.second()); // Second (0-59) (u8)
+Serial.print("centisecond:  ");
+Serial.println(gps.time.centisecond()); // 100ths of a second (0-99) (u8)
+
+Serial.println("------| SPEED/  ALT / COURSE  |------------------------------");
+Serial.print(" Raw speed in 100ths of a knot : ");
+Serial.println(gps.speed.value()); // Raw speed in 100ths of a knot (i32)
+Serial.print("Speed in knots : ");
+Serial.println(gps.speed.knots()); // Speed in knots (double)
+Serial.print("Speed in miles per hour : ");
+Serial.println(gps.speed.mph()); // Speed in miles per hour (double)
+Serial.print("Speed in meters per second : ");
+Serial.println(gps.speed.mps()); // Speed in meters per second (double)
+Serial.print("Speed in kilometers per hour : ");
+Serial.println(gps.speed.kmph()); // Speed in kilometers per hour (double)
+Serial.print("Raw course in 100ths of a degree : ");
+Serial.println(gps.course.value()); // Raw course in 100ths of a degree (i32)
+Serial.print("Course in degrees : ");
+Serial.println(gps.course.deg()); // Course in degrees (double)
+Serial.print("Raw altitude in centimeters: ");
+Serial.println(gps.altitude.value()); // Raw altitude in centimeters (i32)
+Serial.print("Altitude in meters : ");
+Serial.println(gps.altitude.meters()); // Altitude in meters (double)
+Serial.print("Altitude in miles : ");
+Serial.println(gps.altitude.miles()); // Altitude in miles (double)
+Serial.print("Altitude in kilometers : ");
+Serial.println(gps.altitude.kilometers()); // Altitude in kilometers (double)
+Serial.print("Altitude in feet: ");
+Serial.println(gps.altitude.feet()); // Altitude in feet (double)
+
+Serial.print("SATELLITES Fix Age:" );  //Age of last Sat Fix
+Serial.println(gps.satellites.age());
+Serial.print("Number of satellites in use: ");
+Serial.println(gps.satellites.value()); // Number of satellites in use (u32)
+Serial.print("Horizontal Dim. of Precision (100ths) ):");
+Serial.println(gps.hdop.value()); // Horizontal Dim. of Precision (100ths-i32)
+
+ }
   

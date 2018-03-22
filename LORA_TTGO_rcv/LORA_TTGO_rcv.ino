@@ -145,41 +145,40 @@ static  int errorcount=0;
     {
        rssi = LoRa.packetRssi();
 
+  
+    /* Availab jSON VALUES from LRA_TTGO_snd
+     *  
+     *  
+    root["gps_signal"]= true | false // d we have a vlaid signal
+    root["gps_fix_age"]=gps.location.age(); //age() , eturns ms since its last update
+    root["gps_sats"]=gps.satellites.value(); //number of sats
+    root["gps_mph"]= gps.speed.mph(); //ground speed in mph
+    root["gps_course"]= gps.course.deg(); //ground course in 
+    root["gps_alt_ft"]= alttiude in feet
+    root["gps_lat"] =gps.location.lat();
+    root["gps_long"] =gps.location.lng();
+    root["gps_date"] = m/d/yyyy gps date
+    root["gps_time"] = hh:mm:ss 
+    root["gps_sentence"] = number of valid NMEA Gps sentence strings
+     root["gps_chars"] = number of valid NMEA Gps sentence strings
+     root["gps_checksum"] = passed of failed based on NMEA string
+     */
+   
     // Extract JSON Info
     const char* temp= root["temp"];
     const char* msg= root["msg"];
     bool gps_signal=root["gps_signal"];
     int gps_sats=root["gps_sats"];
+    int gps_alt_feet=root["gps_alt_ft"];
     long counter = root["counter"];
     float gps_lat=root["gps_lat"];
     float gps_long=root["gps_long"];
     int gps_sentences= root["gps_sentence"];
+    int gps_chars= root["gps_chars"];
     int gps_mph=root["gps_mph"];
-    int gps_bearing=root["gps_bearing"];
-
-    
-    
-    /* Available json values
-     *  
-     *  
-   root["sensor_temp"] = String(temp_farenheit)+"ºF" ;
-   root["msg"] = "LoRaGPS ";
-   root["counter"] = counter;
-   root["sensor_magnetic"]=String(measurement);
-     *  root["gps_signal"]= true;
-    root["gps_age"]=age;
-    root["gps_sats"]=gps.satellites();
-    root["gps_speed"]= speed;
-    root["gps_course"]= course;
-    root["gps_lat"] =flat;
-    root["gps_long"] =flon;
-      root["gps_signal"]= false;
-   root["gps_sentence"]= (String)sentences;
-   root["gps_checksum"]= failed;
-     * 
-     */
-
-
+    int gps_course=root["gps_course"];
+    long gps_fix_age=root["gps_fix_age"];
+  
     Serial.println("LoRa Receiver");
     Serial.println("Received packet:");
     Serial.println("    '" + packet + "'");
@@ -195,10 +194,10 @@ static  int errorcount=0;
     String flat =(String)gps_lat;
     String flong =(String)gps_long;
     String LatLong= flat.substring(0,4)+" "+flong.substring(0,4); 
-    displayString("GPS Sat:"+(String)gps_sats+" "+(String)counter,(String)gps_mph+ "MPH H" +(String)gps_bearing );
+    displayString("GPS:"+(String)gps_sats+" Alt:"+(String)gps_alt_feet,(String)gps_mph+ "MPH C" +(String)gps_course );
     }
    else
-   displayString("GPS MSG: "+(String)gps_sentences, (String)msg+ (String)counter );
+   displayString("Searching: "+(String)gps_chars, (String)msg+ (String)counter );
   
     } //success JSON parse
   }
