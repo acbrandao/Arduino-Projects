@@ -197,7 +197,7 @@ static  int errorcount=0;
     displayString("GPS:"+(String)gps_sats+" Alt:"+(String)gps_alt_feet,(String)gps_mph+ "MPH C" +(String)gps_course );
     }
    else
-   displayString("Searching: "+(String)gps_chars, (String)msg+ (String)counter );
+   displayString("NO GPS: "+(String)gps_chars, (String)msg+ (String)counter );
   
     } //success JSON parse
   }

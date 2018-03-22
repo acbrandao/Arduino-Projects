@@ -30,8 +30,8 @@ static const uint32_t GPSBaud = 9600;
  *  */
  
 #include <ArduinoJson.h>  //https://arduinojson.org/doc/encoding/ 
-StaticJsonBuffer<256> jsonBuffer;  //Define JSON buffer used by ARduinojSON
-char JSON[256];
+StaticJsonBuffer<200> jsonBuffer;  //Define JSON buffer used by ARduinojSON
+char JSON[200];
 JsonObject& root = jsonBuffer.createObject();
 
 
@@ -157,7 +157,7 @@ void loop() {
   Serial.println(counter);
 
   //Get GPS data
-   get_GPS_data();
+  get_GPS_data();
 
 /*
  *  ESP32 board capabilities Hall sensor and temerature sensor
@@ -269,6 +269,7 @@ void get_GPS_data()
     Serial.print(F(","));
     Serial.print(gps.location.lng(), 6);
     Serial.println();
+    
     root["gps_signal"]= true;
     root["gps_fix_age"]=gps.location.age(); //age() method, which returns the number of milliseconds since its last update
     root["gps_sats"]=gps.satellites.value();
@@ -285,13 +286,13 @@ void get_GPS_data()
     }
 
     //valid timestamp data
-       Serial.print(F("  Date/Time: "));
+     
       if (gps.date.isValid())
       {
       char datetime[16];
-      sprintf(datetime,"%d/%d/%d",gps.date.month(),gps.date.day(),gps.date.year() );
-      root["gps_date"]= datetime;
-      Serial.println("GPS DATE: "+String(datetime));
+     // sprintf(datetime,"%d/%d/%d",gps.date.month(),gps.date.day(),gps.date.year() );
+     // root["gps_date"]= datetime;
+     // Serial.println("GPS DATE: "+String(datetime));
       }
       else
       {
@@ -300,10 +301,10 @@ void get_GPS_data()
 
   if (gps.time.isValid())
   {
-    char timestamp[12];
-    sprintf(timestamp,"%dh:%dm:/%ds",gps.time.hour(),gps.time.minute(),gps.time.second() );
-    root["gps_time"]= timestamp;
-    Serial.println("GPS TIME: "+String(timestamp) );
+  //  char timestamp[16];
+  //  sprintf(timestamp,"%s:%s:%s",gps.time.hour(),gps.time.minute(),gps.time.second() );
+  //  root["gps_time"]= timestamp;
+   // Serial.println("GPS TIME: "+String(timestamp) );
    
    }
   else
@@ -319,7 +320,7 @@ void get_GPS_data()
    }
   
  
-  Serial.printf(" CHARS=%s  SENTENCES=%s CSUM ERR=%s \n",gps.charsProcessed(),gps.sentencesWithFix(),gps.failedChecksum());
+  //Serial.printf(" CHARS=%s  SENTENCES=%s CSUM ERR=%s \n",gps.charsProcessed(),gps.sentencesWithFix(),gps.failedChecksum());
   root["gps_sentence"]= gps.sentencesWithFix();
   root["gps_chars"]= gps.charsProcessed();
   root["gps_checksum"]= gps.failedChecksum();
