@@ -242,6 +242,6 @@ char * TimeToString(unsigned long t)
  t = t % 3600;
  int m = t / 60;
  int s = t % 60;
- sprintf(str, "%%02ld:%02dm:%02ds",  h, m, s);
+ sprintf(str, "%02ld:%02d:%02ds",  h, m, s);
  return str;
 }
