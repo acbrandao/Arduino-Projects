@@ -264,6 +264,12 @@ void get_GPS_data()
     root["gps_alt_ft"]= gps.altitude.feet();
     root["gps_lat"] =gps.location.lat();
     root["gps_long"] =gps.location.lng();
+
+    // denote center coords to calcualte distance to and heading to
+    double HQ_LAT=40.801621 ;
+    double HQ_LONG=-74.166074;
+    root["gps_dist"]=distanceBetweenPoints(HQ_LAT,HQ_LONG);
+    root["gps_heading"]=courseToPoints(HQ_LAT,HQ_LONG);
   
     }
     else
@@ -422,3 +428,23 @@ void displayString(String title, String body)
   delay(10);
 }
 
+double distanceBetweenPoints(double p2_lat, double p2_long)
+{
+  double distanceKm=0.0;
+  //static method require :: 
+ distanceKm = TinyGPSPlus::distanceBetween( gps.location.lat(), gps.location.lng(), p2_lat,  p2_long) / 1000.0;
+ 
+  return distanceKm;
+}
+
+double courseToPoints(double p2_lat, double p2_long)
+{
+double courseTo=0.0;
+
+ courseTo =( !p2_lat ||  !p2_long   ) ?  0.0: TinyGPSPlus::courseTo( gps.location.lat(), gps.location.lng(), p2_lat, p2_long);
+
+Serial.print("Human directions: ");
+Serial.println(TinyGPSPlus::cardinal(courseTo));
+
+return courseTo;
+}
