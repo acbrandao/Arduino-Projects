@@ -60,9 +60,11 @@ SSD1306  display(0x3c, 4, 15);
 #define LORA_CS 18     // GPIO18 -   SX1276 CS
 #define LORA_RST 14   // GPIO14 -    SX1276 RST
 #define LORA_IRQ 26  // GPIO26 -     SX1276 IRQ (interrupt request)
-#define LORA_SpreadingFactor  10 // ranges from 6-12, default 7 see API docs larger more range less data rate
-#define LORA_TX_Power  17  // - TX power in dB, defaults to 17
-#define FREQ 915E6  //Define Lora Frequency depens on Regional laws usually 433E6 , 866E8 or 915E6
+
+#define LORA_TX_Power  17  // - TX power in dB, defaults to 17 laws usually 433E6 , 866E8 or 915E6
+#define LORA_SpreadingFactor  8 // MUST MATCH Sender: ranges from 6-12, default 7 see API docs larger more range less data rate
+#define FREQ 915E6  //MUST MATCH Sender: Define Lora Frequency depends on Regional laws usually 433E6 , 866E8 or 915E6
+
 #define BEACON_INTERVAL 15*1000  //Define how often to sen out the lora signal 
 
 //Esp32 DeepSleep functions
@@ -265,7 +267,7 @@ void get_GPS_data()
     root["gps_lat"] =gps.location.lat();
     root["gps_long"] =gps.location.lng();
 
-    // denote center coords to calcualte distance to and heading to
+    // denote center coords to calculate  distance to HQ points and heading to
     double HQ_LAT=40.801621 ;
     double HQ_LONG=-74.166074;
     root["gps_dist"]=distanceBetweenPoints(HQ_LAT,HQ_LONG);
