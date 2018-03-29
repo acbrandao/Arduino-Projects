@@ -13,17 +13,17 @@
  
 */
 
-#define HAS_GPS_CHIP 1        //define for use with  GPS library or not
-#define SENDER_NODE  1          //define or comment out toggle  sender and receiver nodes
+//#define HAS_GPS_CHIP 1        //define for use with  GPS library or not
+//#define SENDER_NODE  1          //define or comment out toggle  sender and receiver nodes
 #define HAS_OLED                //Define if this has an sdd1306 OLED
-//#define USES_WIFI              //we make use of WIFI in ESP32 
-//#define USES_MQTT              //we make use of PubSub MQTT client libs
+#define USES_WIFI              //we make use of WIFI in ESP32 
+#define USES_MQTT              //we make use of PubSub MQTT client libs
 
 #include <SPI.h>              // include libraries
 #include <LoRa.h>
 #define LORA_TX_Power  17  // - TX power in dB, defaults to 17 
 #define LORA_SpreadingFactor  11 // MUST MATCH Sender: ranges from 6-12, default 7 see API docs larger more range less data rate
-#define LORA_SignalBandwith  15.6E3  //defaults to 125E3 Supported values are 7.8E3, 10.4E3, 15.6E3, 20.8E3, 31.25E3, 41.7E3, 62.5E3, 125E3, and 250E3
+#define LORA_SignalBandwith  125E3  //defaults to 125E3 Supported values are 7.8E3, 10.4E3, 15.6E3, 20.8E3, 31.25E3, 41.7E3, 62.5E3, 125E3, and 250E3
 #define LORA_codingRateDenominator 5  //Supported values are between 5 and 8, to coding rates of 4/5 and 4/8.
 #define LORA_FREQ 866E6  //MUST MATCH Sender: Lora Frequency depends laws of region: 433E6  (Asia), 866E8 (Eur) or 915E6 (US)
 #define BEACON_INTERVAL 2*1000  //Define how often to sen out the lora signal 
@@ -135,7 +135,7 @@ void setup() {
    //Increment boot number and print it every reboot
   ++bootCount;
   Serial.println("------------------------------------------------------------");
-  Serial.println(String(ANNOUNCE_MESSAGE)+"  "+String(LORA_FREQ).substring(0,3)+"Mhz SF:"+String(LORA_SpreadingFactor));  //addounce the type of sender
+  Serial.println(String(ANNOUNCE_MESSAGE)+"  "+String(LORA_FREQ).substring(0,3)+"Mhz SF:"+String(LORA_SpreadingFactor) +" Bandwidth:"+String(LORA_SignalBandwith) );  //addounce the type of sender
   Serial.println("------------------------------------------------------------");
    displayOLED(String(ANNOUNCE_MESSAGE)+" "+String(LORA_FREQ).substring(0,3)+"Mhz  SF:"+String(LORA_SpreadingFactor),"Ready...");
 
@@ -157,8 +157,7 @@ void setup() {
   // Send and receive radios need to be set the same
   LoRa.setSpreadingFactor(LORA_SpreadingFactor); // ranges from 6-12, default 7 see API docs
   LoRa.setSignalBandwidth(LORA_SignalBandwith);
-  LoRa.setCodingRate4(LORA_codingRateDenominator);  //
-
+  
 
 
   #ifdef SENDER_NODE  
