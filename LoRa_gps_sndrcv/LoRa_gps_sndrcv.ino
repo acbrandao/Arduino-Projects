@@ -13,11 +13,11 @@
  
 */
 
-//#define HAS_GPS_CHIP 1        //define for use with  GPS library or not
-//#define SENDER_NODE  1          //define or comment out toggle  sender and receiver nodes
+#define HAS_GPS_CHIP 1        //define for use with  GPS library or not
+#define SENDER_NODE  1          //define or comment out toggle  sender and receiver nodes
 #define HAS_OLED                //Define if this has an sdd1306 OLED
-#define USES_WIFI              //we make use of WIFI in ESP32 
-#define USES_MQTT              //we make use of PubSub MQTT client libs
+//#define USES_WIFI              //we make use of WIFI in ESP32 
+//#define USES_MQTT              //we make use of PubSub MQTT client libs
 
 #include <SPI.h>              // include libraries
 #include <LoRa.h>
@@ -171,6 +171,7 @@ void setup() {
   LoRa.receive();
   Serial.println("LoRa init succeeded.");
 
+#ifdef USES_MQTT
    wifi_connect();
 
     if (WiFi.status()==WL_CONNECTED)  /* Connected to wifi lets try the server */
@@ -180,7 +181,7 @@ void setup() {
       client.setCallback(receivedCallback);
     }
 
-#ifdef USES_MQTT  
+  
    /* if client was disconnected then try to reconnect again */
   if (!client.connected()) {
     mqttconnect();
