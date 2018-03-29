@@ -13,12 +13,13 @@
  
 */
 
-#define HAS_GPS_CHIP 1        //define for use with  GPS library or not
-#define SENDER_NODE  1          //define or comment out toggle  sender and receiver nodes
+//#define HAS_GPS_CHIP 1        //define for use with  GPS library or not
+//#define SENDER_NODE  1          //define or comment out toggle  sender and receiver nodes
 #define HAS_OLED                //Define if this has an sdd1306 OLED
+#define USES_WIFI              //we make use of WIFI in ESP32 
+#define USES_MQTT              //we make use of PubSub MQTT client libs
 
 #include <SPI.h>              // include libraries
-#include <Wire.h>  // Only needed for Arduino 1.6.5 and earlier
 #include <LoRa.h>
 #define LORA_TX_Power  17  // - TX power in dB, defaults to 17 laws usually 433E6 , 866E6 or 915E6
 #define LORA_SpreadingFactor  11 // MUST MATCH Sender: ranges from 6-12, default 7 see API docs larger more range less data rate
@@ -33,8 +34,23 @@
 #define LORA_RST 14   // GPIO14 -    SX1276 RST
 #define LORA_IRQ 26  // GPIO26 -     SX1276 IRQ (interrupt request)
 
-#ifdef HAS_GPS_CHIP
+#ifdef USES_WIFI
+#include <WiFi.h>
+#include "wifi_config.h"   //has #define WIFI_SSID "your_ssid" #define WIFI_SSID "your_password"
 
+bool wifi_connected=false;
+#endif
+
+#ifdef USES_MQTT
+#include <PubSubClient.h>
+
+const char* mqtt_server = "192.168.1.190";   /* IP address of MQTT Broker */
+/* create an instance of PubSubClient client */
+WiFiClient espClient;
+PubSubClient client(espClient);
+#endif
+
+#ifdef HAS_GPS_CHIP
 #include <TinyGPS++.h>
 TinyGPSPlus gps;   // The TinyGPS++ object  ig GPS sensor attached
 
@@ -143,13 +159,30 @@ void setup() {
    LoRa.setTxPower(LORA_TX_Power, PA_OUTPUT_RFO_PIN);
   #endif 
 
- 
 
   //LoRa.onReceive(onReceive);  //register the Callback
   LoRa.receive();
   Serial.println("LoRa init succeeded.");
 
- 
+   wifi_connect();
+
+    if (WiFi.status()==WL_CONNECTED)  /* Connected to wifi lets try the server */
+    {
+      client.setServer(mqtt_server, 1883);  /* configure the MQTT server with IPaddress and port */
+      /* this receivedCallback function will be invoked   when client received subscribed topic */
+      client.setCallback(receivedCallback);
+    }
+
+#ifdef USES_MQTT  
+   /* if client was disconnected then try to reconnect again */
+  if (!client.connected()) {
+    mqttconnect();
+     client.publish("lora/node/msgid", "Online",false ); 
+  }
+#endif
+
+    displayOLED(String(ANNOUNCE_MESSAGE)+" "+String(FREQ).substring(0,3)+"Mhz  SF:"+String(LORA_SpreadingFactor),"Ready...");
+
 } //end of setup()
 
 /*  loop() : Main Program loop */
@@ -173,14 +206,13 @@ void loop() {
     LoRa.receive();                     // go back into receive mode
     #else
       // RECEIVER try to parse packet
+   
       int packetSize = LoRa.parsePacket();
       onReceived(packetSize);
       //Serial.println("Rx "+String(FREQ).substring(0,3)+"Mhz SF:"+String(LORA_SpreadingFactor) );
     //delay(500);    
     #endif
   }
-
-
 }
 
 void sendMessage(String outgoing) {
@@ -243,6 +275,22 @@ void onReceived(int packetSize) {
     {
        Serial.println("GPS SIGNAL: " + incoming);
        displayOLED("GPS "+String(gps_time)+" "+(String)packetSize+"b" ,String(gps_lat).substring(0,5)+"/"+String(gps_long).substring(0,6) ); 
+ 
+#ifdef USES_MQTT  
+   /* if client was disconnected then try to reconnect again */
+    if (!client.connected()) {
+          mqttconnect();
+      Serial.println("RE-connecting to mqtt server "); 
+       }
+      /* publish the message */
+      client.publish("lora/node/msgid", String(incomingMsgId).c_str()); 
+      client.publish("lora/node/gps_lat", gps_lat);
+      client.publish("lora/node/gps_long", gps_long);
+      client.publish("lora/node/gps_time", gps_time);
+      client.publish("lora/node/sender_id", String(sender, HEX).c_str() );   
+      Serial.println("Publising to mqtt server "); 
+     
+#endif 
     }
   else
   {
@@ -360,7 +408,6 @@ String gps_message="0|no gps signal";  //default message 0=no signal
       sprintf(gps_time,"%02d:%02d:%02d",gps.time.hour(),gps.time.minute(),gps.time.second() );
         Serial.println("VALID GPS TIME: "+(String)gps_time );
       }  //valid time
-
      
       sprintf(gps_signal,"%d",gps.location.isValid() );
       sprintf(gps_sats,"%d",gps.satellites.value() );
@@ -384,3 +431,74 @@ String gps_message="0|no gps signal";  //default message 0=no signal
  } //end of function
 
 #endif
+
+#ifdef USES_MQTT  
+void mqttconnect() {
+  /* Loop until reconnected */
+  
+  while (!client.connected())    //check that we're connected
+   {
+    Serial.print("MQTT connecting ...");
+    displayOLED("MQTT Connecting "+String(mqtt_server),"..." );
+    /* client ID */
+    String clientId = "TTGOESP32Client";
+    /* connect now */
+    if (client.connect(clientId.c_str())) {
+      Serial.println("connected");
+       displayOLED("MQTT Connected "+String(mqtt_server),clientId.c_str() );
+    
+      /* subscribe topic with default QoS 0*/
+   
+    } else {
+      Serial.print("failed, status code =");
+      Serial.print(client.state());
+       displayOLED("MQTT  "+String(mqtt_server),"FAILED MQTT" );
+      Serial.println("try again in 5 seconds");
+      /* Wait 3 seconds before retrying */
+      delay(3000);
+    }
+  }
+}
+
+void receivedCallback(char* topic, byte* payload, unsigned int length) 
+{
+  Serial.print("Message received: ");
+  Serial.println(topic);
+
+  Serial.print("payload: ");
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
+  
+}
+#endif
+
+bool wifi_connect()
+{
+  int trycount=0;  
+#ifdef USES_WIFI  
+  Serial.println();
+  Serial.printf("WIFI Connecting to %s \n",WIFI_SSID);
+  displayOLED("Wifi Connection: "+String(WIFI_SSID),"Starting...");
+
+  WiFi.begin(WIFI_SSID, WIFI_PWD);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print("Trying..."+String(trycount++));
+    displayOLED("Wifi SSID "+String(WIFI_SSID),"try... "+String(trycount++));
+  }
+  
+  Serial.println("");
+  Serial.println("WiFi connected");
+  
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+  
+ displayOLED("Wifi Connected! "+String(WIFI_SSID),String(WiFi.localIP() ) );
+return WiFi.status();
+
+#endif
+}
+
