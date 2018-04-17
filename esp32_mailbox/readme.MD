@@ -3,6 +3,8 @@
 
 How I took my rusty old mailbox (literally)  and made it into smart mailbox (an IoT device) and in the process  how I  learned about Arduino and particularly  the ESP32 chip which lets us relatively easily  setup with minimal costs and complexity for a battery powered mailbox  notification system (and many other IoT projects) .
 
+Complete dettailed description here: http://www.abrandao.com/2018/04/arduino_esp32_battery_wifi_door_mailbox_sensor/
+
 This Sketch is for use with an Arduno ESP32 board, and a door sensor and it will communcate the door status and changes via a MQTT broker
 
 
@@ -17,6 +19,13 @@ his project only requires a few items:
   * a project box, to keep everything enclosed
   *  plus a  tiny bit of soldering, some tape, adhesive putty   and that’s about it
   * a [ MQTT broker | https://www.hivemq.com/blog/mqtt-essentials-part-3-client-broker-connection-establishment ] such as Mosquitto (local) or HiveMQ cloud based , this is what receives the messsages ..
+
+
+
+## Wiring it up
+![esp32 door sensr diagram](http://www.abrandao.com/wp-content/uploads/2018/04/esp32-Mailbox-door-sensor_bb.png "ESp3 door sensor diagam")
+
+
 
 ### Installing
 
