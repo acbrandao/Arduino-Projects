@@ -5,4 +5,4 @@
 Personal Arduino Projects, this is where I will put my Arduino Projects and examples.
 Most of my arduino projects are ESP32 and ESP8266 based projects that make use of these WiFi chips .
 
-Like what you see? :thumbsup: **share the love with some git stars :star: **
+Like what you see? Don't just fork it, Throw me some :heart: love with  :thumbsup: **share the love with some git stars :star: **
