@@ -40,6 +40,7 @@ emulating "user activity" and preventing screen-saver from locking up desktop.
 ## Considerations
 
   * When plugged in, your Arduino device will be recognized as keyboard & mouse. You can have multiple keyboards and mice attached to your system, no need to remove any of them
+  * The Movements are designed to be non-invasice and you can reduce the movement distance to a few pixes to not disturb sensitive computer operations.
   * Mouse cursor should "jiggle" at random patterns and random intevals all this is customizable via the code
 
 ### Reliability
