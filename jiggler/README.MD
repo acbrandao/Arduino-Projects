@@ -10,8 +10,8 @@ emulating "user activity" and preventing screen-saver from locking up desktop.
 
 ## Requirements Hardware (what you will need)
 
-  * Arduino board with USB support (Arduino Leonardo/Nano/Micro/Micro Pro or simillar - those could be bought from different retailers for less than $5) There are many possible boards below is just a partial list of possible ones:
-![XIAO Mouse Jiggler](XIAO_Mouse_jiggler.jpg)
+  * Arduino board with USB support (Arduino Leonardo/Nano/Micro/Micro Pro or simillar - those could be bought from different retailers for less than $5) There are many possible boards below is just a partial list of possible ones: ![XIAO Mouse Jiggler](XIAO_Mouse_jiggler.jpg)
+
 | Board Name               | Description                                                                                     | Hardware Page Link                                                                 |
 |--------------------------|-------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|
 | XIAO SAMD21 for $5       | Arduino boards based on the 32u4 or SAMD microcontrollers are compatible with the Mouse.h library. This is the board I’m using. | [Seeed Studio XIAO SAMD21](https://www.seeedstudio.com/Seeeduino-XIAO-Arduino-Microcontroller-SAMD21-Cortex-M0+-p-4426.html) |
@@ -24,7 +24,8 @@ emulating "user activity" and preventing screen-saver from locking up desktop.
 | Arduino UNO R4 Minima    | The latest UNO revision supports HID, a feature not found on previous UNO boards.               | [Arduino UNO R4 Minima](https://store.arduino.cc/products/uno-r4-minima)           |
 | Arduino UNO R4 WiFi      | Like the Minima, this board also supports HID.                                                  | [Arduino UNO R4 WiFi](https://store.arduino.cc/products/uno-r4-wifi)               |
 | Arduino GIGA R1 WiFi     | This powerful board supports HID through its USB-C port.                                        | [Arduino GIGA R1 WiFi](https://store.arduino.cc/products/giga-r1-wifi)             |
-  * USB Micro-B (male) to USB Type-A (male) connector - becaue Arduino comes with micro USB port (those are commonly used to transfer data between smartphone and computer)
+
+ * USB Micro-B (male) to USB Type-A (male) connector - becaue Arduino comes with micro USB port (those are commonly used to transfer data between smartphone and computer)
   * Arduino IDE (https://www.arduino.cc/en/Main/Software) - program Arduino device
 
 ## Installation
