@@ -8,10 +8,10 @@ After installation on hardware device (arduino) and plugging it to computer USB 
 registers itself as regular HID mouse. Every few seconds it makes tiny cursor movements,
 emulating "user activity" and preventing screen-saver from locking up desktop.
 
-## Requirements (what you will need)
+## Requirements Hardware (what you will need)
 
   * Arduino board with USB support (Arduino Leonardo/Nano/Micro/Micro Pro or simillar - those could be bought from different retailers for less than $5) There are many possible boards below is just a partial list of possible ones:
-
+![XIAO Mouse Jiggler](XIAO_Mouse_jiggler.jpg)
 | Board Name               | Description                                                                                     | Hardware Page Link                                                                 |
 |--------------------------|-------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|
 | XIAO SAMD21 for $5       | Arduino boards based on the 32u4 or SAMD microcontrollers are compatible with the Mouse.h library. This is the board I’m using. | [Seeed Studio XIAO SAMD21](https://www.seeedstudio.com/Seeeduino-XIAO-Arduino-Microcontroller-SAMD21-Cortex-M0+-p-4426.html) |
